@@ -7,5 +7,6 @@ const String kWindowChannel = 'online.mucsarocsoge.xerno/window';
 const String kDesktopEntry = 'online.mucsarocsoge.xerno_music';
 const String kSyncSchema = 'xerno.sync.v1';
 const String kUserLibrarySchema = 'xerno.user_library.v1';
-const String kDefaultCloudHint = 'https://cloud.mucsarocsoge.online';
+const String kDefaultManifestUrl =
+    'https://cloud.mucsarocsoge.online/u/6fffca60-36cb-447b-b71a-6d823ccaa0bc.json';
 const String kLrclibHost = 'lrclib.net';

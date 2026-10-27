@@ -6,7 +6,7 @@ The interface is a matte obsidian and forest-green layout with Newsreader headli
 
 ## What it plays
 
-The app ships with `assets/library.json`, the master catalog: `liked_1_80`, `illit_osszes`, `ocsem_random`, and `kanye_west_bangers`, plus every track record in that file. Settings can refresh the same JSON from a RöcsögeCloud, R2, or any other URL, or read `library.json` from an unzipped `spotify_library` folder on disk.
+The app ships with `assets/library.json`, the master catalog: `liked_1_80`, `illit_osszes`, `ocsem_random`, and `kanye_west_bangers`, plus every track record in that file. Settings opens with the RöcsögeCloud manifest at `https://cloud.mucsarocsoge.online/u/6fffca60-36cb-447b-b71a-6d823ccaa0bc.json`, so Refresh manifest works without typing a URL. That field also accepts any other manifest URL, or the app can read `library.json` from an unzipped `spotify_library` folder on disk.
 
 A track plays from, in order:
 

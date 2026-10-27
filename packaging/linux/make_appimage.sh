@@ -42,5 +42,6 @@ if [[ ! -x "$TOOL" ]]; then
 fi
 
 export APPIMAGE_EXTRACT_AND_RUN=1
-ARCH=x86_64 "$TOOL" "$APPDIR" "$OUT/XernoMusic-${VERSION}-linux-x86_64.AppImage"
+ARCH=x86_64 "$TOOL" --appimage-extract-and-run "$APPDIR" \
+  "$OUT/XernoMusic-${VERSION}-linux-x86_64.AppImage"
 echo "Wrote $OUT/XernoMusic-${VERSION}-linux-x86_64.AppImage"

@@ -1,3 +1,4 @@
+import '../constants.dart';
 import '../format.dart';
 import '../logic/eq.dart';
 import 'json_util.dart';
@@ -14,7 +15,7 @@ SourcePreference sourcePreferenceFromName(String? raw) {
 
 class AppSettings {
   AppSettings({
-    this.manifestUrl = '',
+    this.manifestUrl = kDefaultManifestUrl,
     this.localLibraryPath = '',
     this.cloudBaseUrl = '',
     this.sourcePreference = SourcePreference.auto,
@@ -149,7 +150,7 @@ class AppSettings {
       gains.add(0);
     }
     return AppSettings(
-      manifestUrl: asString(map['manifest_url']),
+      manifestUrl: asString(map['manifest_url'], kDefaultManifestUrl),
       localLibraryPath: asString(map['local_library_path']),
       cloudBaseUrl: asString(map['cloud_base_url']),
       sourcePreference: sourcePreferenceFromName(

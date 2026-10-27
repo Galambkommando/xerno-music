@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:xerno_music/src/constants.dart';
 import 'package:xerno_music/src/logic/eq.dart';
 import 'package:xerno_music/src/logic/lrc.dart';
 import 'package:xerno_music/src/logic/play_queue.dart';
@@ -181,6 +182,7 @@ void main() {
       expect(settings.pitch, 0.5);
       expect(settings.eqGains, [1, 2, 0, 0, 0]);
       expect(settings.frostedGlass, isFalse);
+      expect(settings.manifestUrl, kDefaultManifestUrl);
       final again = AppSettings.fromJson(settings.toJson());
       expect(again.deviceId, 'abc');
       expect(again.eqPreset, 'Flat');

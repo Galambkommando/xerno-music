@@ -129,7 +129,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 controller: _manifest,
                 decoration: xernoField(
                   'Cloud manifest URL',
-                  hint: '$kDefaultCloudHint/library.json',
+                  hint: kDefaultManifestUrl,
                 ),
                 onSubmitted: (_) => unawaited(_saveFields()),
               ),
