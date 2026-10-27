@@ -10,3 +10,5 @@ const String kUserLibrarySchema = 'xerno.user_library.v1';
 const String kDefaultManifestUrl =
     'https://cloud.mucsarocsoge.online/u/6fffca60-36cb-447b-b71a-6d823ccaa0bc.json';
 const String kLrclibHost = 'lrclib.net';
+const String kMissingLibmpvMessage =
+    'libmpv is missing. On CachyOS/Arch run: sudo pacman -S mpv';

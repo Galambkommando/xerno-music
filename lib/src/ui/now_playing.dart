@@ -12,6 +12,41 @@ import '../theme/app_theme.dart';
 import 'sound_controls.dart';
 import 'widgets.dart';
 
+class PlaybackFailureBanner extends ConsumerWidget {
+  const PlaybackFailureBanner({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final snapshot = watchSnapshot(ref);
+    final message = snapshot.error;
+    if (message == null || message.isEmpty || snapshot.hasTrack) {
+      return const SizedBox.shrink();
+    }
+    return Material(
+      color: AppColors.elevated,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            const Icon(Icons.info_outline, color: AppColors.mint, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  color: AppColors.ivory,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class NowPlayingSlot extends ConsumerWidget {
   const NowPlayingSlot({super.key});
 
@@ -165,7 +200,10 @@ class MiniPlayerView extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    track?.title ?? 'Nothing playing',
+                    track?.title ??
+                        (snapshot.error == null
+                            ? 'Nothing playing'
+                            : 'Playback unavailable'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -175,8 +213,8 @@ class MiniPlayerView extends ConsumerWidget {
                     ),
                   ),
                   Text(
-                    track?.artist ?? 'Xerno',
-                    maxLines: 1,
+                    track?.artist ?? snapshot.error ?? 'Xerno',
+                    maxLines: snapshot.error != null && track == null ? 3 : 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall,
                   ),

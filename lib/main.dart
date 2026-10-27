@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer';
+import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
@@ -24,17 +25,7 @@ MprisBridge? xernoMprisBridge;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (isLinuxDesktop) {
-    JustAudioMediaKit.ensureInitialized(
-      linux: true,
-      windows: false,
-      android: false,
-      iOS: false,
-      macOS: false,
-    );
-    JustAudioMediaKit.pitch = true;
-    JustAudioMediaKit.title = kAppName;
-  }
+  final mediaKitReady = !isLinuxDesktop || _startLinuxMediaKit();
 
   final settings = await _loadSettings();
   if (settings.supabaseUrl.trim().isNotEmpty &&
@@ -42,7 +33,7 @@ Future<void> main() async {
     await SupabaseGate.ensure(settings);
   }
 
-  final player = await _startPlayer(settings);
+  final player = await _startPlayer(settings, mediaKitReady: mediaKitReady);
   runApp(
     ProviderScope(
       overrides: [
@@ -63,7 +54,69 @@ Future<AppSettings> _loadSettings() async {
   }
 }
 
-Future<PlaybackPort> _startPlayer(AppSettings settings) async {
+/// Loads libmpv without letting a missing library kill the process.
+///
+/// `JustAudioMediaKit.ensureInitialized` throws before `runApp` when mpv is
+/// not installed. Creating a player would throw again, so callers must skip
+/// it when this returns false.
+bool _startLinuxMediaKit() {
+  Object? lastError;
+  StackTrace? lastStack;
+  for (final candidate in _libmpvCandidates()) {
+    try {
+      JustAudioMediaKit.ensureInitialized(
+        linux: true,
+        windows: false,
+        android: false,
+        iOS: false,
+        macOS: false,
+        libmpv: candidate,
+      );
+      JustAudioMediaKit.pitch = true;
+      JustAudioMediaKit.title = kAppName;
+      return true;
+    } catch (error, stack) {
+      lastError = error;
+      lastStack = stack;
+    }
+  }
+  log(kMissingLibmpvMessage, error: lastError, stackTrace: lastStack);
+  stderr.writeln(kMissingLibmpvMessage);
+  return false;
+}
+
+List<String?> _libmpvCandidates() {
+  final paths = <String?>[];
+  final env = Platform.environment['LIBMPV_LIBRARY_PATH'];
+  if (env != null && env.isNotEmpty && File(env).existsSync()) {
+    paths.add(env);
+  }
+  const known = [
+    '/usr/lib/libmpv.so.2',
+    '/usr/lib/libmpv.so',
+    '/usr/lib64/libmpv.so.2',
+    '/usr/lib64/libmpv.so',
+    '/usr/lib/x86_64-linux-gnu/libmpv.so.2',
+    '/usr/lib/x86_64-linux-gnu/libmpv.so',
+    '/lib/x86_64-linux-gnu/libmpv.so.2',
+    '/lib/x86_64-linux-gnu/libmpv.so',
+  ];
+  for (final path in known) {
+    if (File(path).existsSync()) paths.add(path);
+  }
+  // media_kit then tries the sonames libmpv.so, libmpv.so.2, and libmpv.so.1.
+  paths.add(null);
+  return paths;
+}
+
+Future<PlaybackPort> _startPlayer(
+  AppSettings settings, {
+  required bool mediaKitReady,
+}) async {
+  if (isLinuxDesktop && !mediaKitReady) {
+    return ManualPlayback(failure: kMissingLibmpvMessage);
+  }
+
   final XernoEngine engine;
   try {
     engine = XernoEngine();
@@ -78,7 +131,15 @@ Future<PlaybackPort> _startPlayer(AppSettings settings) async {
     );
   } catch (error, stack) {
     log('Playback engine did not start.', error: error, stackTrace: stack);
-    return ManualPlayback(failure: 'Playback engine did not start.');
+    final missingLibmpv = error.toString().contains('libmpv');
+    if (missingLibmpv) {
+      stderr.writeln(kMissingLibmpvMessage);
+    }
+    return ManualPlayback(
+      failure: missingLibmpv
+          ? kMissingLibmpvMessage
+          : 'Playback engine did not start.',
+    );
   }
 
   try {

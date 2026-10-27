@@ -135,6 +135,17 @@ static void my_application_activate(GApplication* application) {
   self->window = window;
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
+  // Linux defaults Impeller on in the embedder, and its OpenGL ES backend can
+  // fail to present a frame on Wayland (Hyprland, KWin, Sway) until the
+  // toplevel is already mapped. Skia is the engine default on Linux.
+  // FLUTTER_ENGINE_SWITCHES is stripped from release builds, so this flag is
+  // the switch that actually applies. XERNO_ENABLE_IMPELLER=1 turns Impeller
+  // back on.
+  const gchar* impeller = g_getenv("XERNO_ENABLE_IMPELLER");
+  const gboolean use_impeller =
+      impeller != nullptr &&
+      (g_strcmp0(impeller, "1") == 0 || g_strcmp0(impeller, "true") == 0);
+  fl_dart_project_set_enable_impeller(project, use_impeller);
   fl_dart_project_set_dart_entrypoint_arguments(
       project, self->dart_entrypoint_arguments);
 
@@ -147,8 +158,12 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_show(GTK_WIDGET(view));
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
 
-  // Show the window when Flutter renders.
-  // Requires the view to be realized so we can start rendering.
+  // Map immediately. On Wayland, waiting for first-frame leaves the toplevel
+  // unmapped, and a compositor will not deliver that frame until it is mapped.
+  // If Dart dies before runApp (for example while loading libmpv), the process
+  // would otherwise sit with no window. first_frame_cb shows it again.
+  gtk_widget_show(GTK_WIDGET(window));
+
   g_signal_connect_swapped(view, "first-frame", G_CALLBACK(first_frame_cb),
                            self);
   gtk_widget_realize(GTK_WIDGET(view));

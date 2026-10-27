@@ -214,6 +214,7 @@ class _XernoShellState extends ConsumerState<XernoShell> {
                       Expanded(
                         child: Column(
                           children: [
+                            const PlaybackFailureBanner(),
                             Expanded(child: page),
                             const NowPlayingSlot(),
                           ],
@@ -223,6 +224,7 @@ class _XernoShellState extends ConsumerState<XernoShell> {
                   )
                 : Column(
                     children: [
+                      const PlaybackFailureBanner(),
                       Expanded(child: page),
                       const NowPlayingSlot(),
                       const _MobileNav(),

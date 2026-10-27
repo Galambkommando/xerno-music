@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xerno_music/app.dart';
+import 'package:xerno_music/src/constants.dart';
 import 'package:xerno_music/src/models/library.dart';
 import 'package:xerno_music/src/models/settings.dart';
 import 'package:xerno_music/src/models/track.dart';
@@ -71,6 +72,31 @@ void main() {
     await tester.tap(find.textContaining('ILLIT'));
     await tester.pumpAndSettle();
     expect(find.text('Nothing matches this view yet.'), findsOneWidget);
+  });
+
+  testWidgets('a missing playback engine stays on screen', (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          initialSettingsProvider.overrideWithValue(
+            AppSettings(deviceId: 'test-device'),
+          ),
+          playerProvider.overrideWithValue(
+            ManualPlayback(failure: kMissingLibmpvMessage),
+          ),
+          librarySeedProvider.overrideWithValue(fixtureCatalog()),
+        ],
+        child: const XernoApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Xerno'), findsWidgets);
+    expect(find.text(kMissingLibmpvMessage), findsOneWidget);
+    expect(find.textContaining('Liked Songs'), findsOneWidget);
   });
 
   testWidgets('phone home keeps the masthead', (tester) async {
