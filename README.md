@@ -26,7 +26,7 @@ Pin a track, or a whole playlist, to download the MP3 into the app's offline fol
 
 ## Playback
 
-- Linux uses libmpv through `just_audio` and publishes an MPRIS interface (`org.mpris.MediaPlayer2.xernomusic`) so media keys and desktop applets can control it. If `mpv` is not installed the window still opens and shows `sudo pacman -S mpv`.
+- Linux uses libmpv through `just_audio` and publishes an MPRIS interface (`org.mpris.MediaPlayer2.xernomusic`) so media keys and desktop applets can control it. If `mpv` is not installed the window still opens and shows `sudo pacman -S mpv`. The release build draws with Skia so the window maps on Wayland. `XERNO_ENABLE_IMPELLER=1` turns Impeller back on.
 - Android keeps a foreground media notification and lock-screen controls.
 - The Linux mini-player toggle asks the window to stay above other windows and shrink to a compact size.
 - Lyrics are requested from [LRCLIB](https://lrclib.net/api/get) and fall back to a plain text version. Synced lines follow the playhead.
