@@ -69,6 +69,22 @@ List<LyricLine> parseLrc(String input) {
   return lines;
 }
 
+/// How far through [index] the playhead is, from 0 at the line start to 1 at the next.
+double lyricLineProgress(List<LyricLine> lines, int index, Duration position) {
+  if (index < 0 || index >= lines.length) return 0;
+  final start = lines[index].time;
+  if (position <= start) return 0;
+  final end = index + 1 < lines.length
+      ? lines[index + 1].time
+      : start + const Duration(seconds: 5);
+  final span = end - start;
+  if (span <= Duration.zero) return 1;
+  final value = (position - start).inMicroseconds / span.inMicroseconds;
+  if (value <= 0) return 0;
+  if (value >= 1) return 1;
+  return value;
+}
+
 int activeLyricIndex(List<LyricLine> lines, Duration position) {
   var index = -1;
   for (var i = 0; i < lines.length; i++) {

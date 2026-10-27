@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xerno_music/app.dart';
 import 'package:xerno_music/src/constants.dart';
+import 'package:xerno_music/src/logic/lrc.dart';
 import 'package:xerno_music/src/models/library.dart';
 import 'package:xerno_music/src/models/settings.dart';
 import 'package:xerno_music/src/models/track.dart';
 import 'package:xerno_music/src/player/playback.dart';
 import 'package:xerno_music/src/state/providers.dart';
+import 'package:xerno_music/src/ui/now_playing.dart';
 import 'package:xerno_music/src/ui/shell.dart';
 import 'package:xerno_music/src/ui/widgets.dart';
 
@@ -36,10 +39,15 @@ LibraryIndex fixtureCatalog() {
           id: 't1',
           title: 'Forest Line',
           artist: 'Sample Artist',
+          artists: ['Sample Artist', 'Guest One'],
+          albumArtist: 'Sample Artist',
           album: 'Night Pine',
           durationSec: 180,
           durationFormatted: '3:00',
           year: 2024,
+          file: TrackFile(
+            ziplineUrl: 'https://cloud.mucsarocsoge.online/u/forest.mp3',
+          ),
         ),
       ],
     ),
@@ -145,5 +153,109 @@ void main() {
     );
     expect(find.textContaining('Liked Songs'), findsWidgets);
     expect(find.text('Ready to play'), findsOneWidget);
+  });
+
+  testWidgets('track menu copies the server link', (tester) async {
+    tester.view.physicalSize = const Size(1200, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final track = fixtureCatalog().tracks.single;
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          final arguments = call.arguments;
+          if (arguments is Map) copied = arguments['text'] as String?;
+          return null;
+        }
+        if (call.method == 'Clipboard.getData') {
+          return <String, dynamic>{'text': copied};
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          initialSettingsProvider.overrideWithValue(
+            AppSettings(deviceId: 'test-device'),
+          ),
+          playerProvider.overrideWithValue(ManualPlayback()),
+          librarySeedProvider.overrideWithValue(fixtureCatalog()),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: TrackRow(track: track, number: 1, onPlay: () {}),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.byTooltip('Track actions'));
+    await tester.pump();
+    expect(find.text('Server link (RöcsögeCloud)'), findsOneWidget);
+    await tester.tap(find.text('Server link (RöcsögeCloud)').hitTestable());
+    await tester.pump();
+    expect(copied, 'https://cloud.mucsarocsoge.online/u/forest.mp3');
+    expect(find.textContaining('Copied server link:'), findsOneWidget);
+  });
+
+  testWidgets('spicy lyrics seeks the tapped line', (tester) async {
+    final playback = ManualPlayback();
+    final playable = Playable(
+      id: 't1',
+      title: 'Forest Line',
+      artist: 'Sample Artist',
+      album: 'Night Pine',
+      duration: const Duration(seconds: 180),
+      uri: Uri.parse('https://cloud.mucsarocsoge.online/u/forest.mp3'),
+      sourceLabel: 'Cloud',
+    );
+    await playback.playAll(
+      [playable],
+      autoplay: false,
+      position: const Duration(seconds: 2),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          initialSettingsProvider.overrideWithValue(
+            AppSettings(deviceId: 'test-device'),
+          ),
+          playerProvider.overrideWithValue(playback),
+          librarySeedProvider.overrideWithValue(fixtureCatalog()),
+          lyricsProvider.overrideWith(
+            (ref, id) async => const Lyrics(
+              synced: [
+                LyricLine(Duration(seconds: 1), 'Open the pine'),
+                LyricLine(Duration(seconds: 12), 'Second line stays dim'),
+              ],
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: NowPlayingScreen()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.text('Split View'), findsOneWidget);
+    expect(find.text('Focus Lyrics'), findsOneWidget);
+    expect(find.text('Cover Stage'), findsOneWidget);
+    expect(find.text('Open the pine'), findsOneWidget);
+    expect(find.text('Synced Lyrics · LRCLIB'), findsOneWidget);
+    await tester.tap(find.text('Second line stays dim'));
+    await tester.pump();
+    expect(playback.snapshot.position, const Duration(seconds: 12));
+    await tester.tap(find.text('Focus Lyrics'));
+    await tester.pump();
+    expect(find.text('Open the pine'), findsOneWidget);
   });
 }

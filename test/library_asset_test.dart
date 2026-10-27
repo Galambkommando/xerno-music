@@ -26,6 +26,22 @@ void main() {
     expect(index.playlistById('kanye_west_bangers')!.name, contains('KANYE'));
     expect(index.playlistById('kanye_west_bangers')!.trackCount, 448);
     expect(index.playlistById('ocsem_random')!.trackCount, 74);
+    final artists = index.listedArtists();
+    expect(artists.first.name, 'Kanye West');
+    expect(artists.first.trackCount, 393);
+    expect(
+      artists.take(7).map((group) => group.name),
+      containsAll(['Ye', 'ILLIT', 'JAŸ-Z', 'Ado', 'Joost']),
+    );
+    expect(
+      artists.take(12).map((group) => group.name),
+      isNot(contains('88-Keys')),
+    );
+    expect(index.creditArtistCount, 285);
+    expect(
+      index.listedArtists(mainOnly: false).map((group) => group.name),
+      contains('88-Keys'),
+    );
     for (final playlist in index.manifest.playlists) {
       expect(playlist.status, 'complete');
       for (final id in playlist.trackIds) {

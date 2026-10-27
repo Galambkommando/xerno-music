@@ -374,14 +374,17 @@ class _Sidebar extends ConsumerWidget {
         width: 268,
         child: GlassSurface(
           frosted: settings.frostedGlass,
+          blur: true,
           radius: 20,
           shadow: true,
-          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
           child: ListView(
             padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
             children: [
               const _Brand(),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
+              const Eyebrow('DISCOVER'),
+              const SizedBox(height: 6),
               _NavRow(
                 label: 'Home',
                 icon: Icons.home_rounded,
@@ -394,6 +397,9 @@ class _Sidebar extends ConsumerWidget {
                 section: ShellSection.search,
                 selected: nav.section,
               ),
+              const SizedBox(height: 12),
+              const Eyebrow('LIBRARY'),
+              const SizedBox(height: 6),
               _NavRow(
                 label: 'All songs',
                 icon: Icons.library_music_rounded,
@@ -595,7 +601,7 @@ class _SideButton extends StatelessWidget {
               ),
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               child: Row(
                 children: [
                   Container(

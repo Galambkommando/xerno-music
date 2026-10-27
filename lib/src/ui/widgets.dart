@@ -2,9 +2,12 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../format.dart';
+import '../logic/source_resolver.dart';
 import '../logic/track_query.dart';
 import '../models/library.dart';
 import '../models/track.dart';
@@ -21,6 +24,7 @@ class GlassSurface extends StatelessWidget {
     this.border,
     this.radius = 0,
     this.shadow = false,
+    this.blur = false,
     super.key,
   });
 
@@ -30,6 +34,9 @@ class GlassSurface extends StatelessWidget {
   final BoxBorder? border;
   final double radius;
   final bool shadow;
+
+  /// Backdrop blur is reserved for the sidebar, the player dock, and sheets.
+  final bool blur;
 
   @override
   Widget build(BuildContext context) {
@@ -44,39 +51,70 @@ class GlassSurface extends StatelessWidget {
         child: child,
       );
     }
+    if (!blur) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFF151F1A),
+          borderRadius: radius,
+          border: border ?? Border.all(color: const Color(0xFF23332B)),
+          boxShadow: shadow
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.22),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ]
+              : null,
+        ),
+        child: child,
+      );
+    }
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,
-        boxShadow: shadow
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.28),
-                  blurRadius: 28,
-                  offset: const Offset(0, 14),
-                ),
-              ]
-            : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.38),
+            blurRadius: 28,
+            offset: const Offset(0, 14),
+          ),
+        ],
       ),
       child: ClipRRect(
         borderRadius: radius,
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withValues(alpha: 0.09),
-                  color.withValues(alpha: 0.68),
-                ],
-              ),
+              color: const Color(0xB8101613),
               borderRadius: radius,
               border:
                   border ??
-                  Border.all(color: Colors.white.withValues(alpha: 0.14)),
+                  Border.all(color: Colors.white.withValues(alpha: 0.16)),
             ),
-            child: child,
+            child: Stack(
+              children: [
+                child,
+                const Positioned(
+                  top: 0,
+                  left: 16,
+                  right: 16,
+                  height: 1,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Color(0x00FFFFFF),
+                          Color(0x38FFFFFF),
+                          Color(0x00FFFFFF),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -290,6 +328,8 @@ class CoverImage extends StatelessWidget {
         : Image.network(
             url!,
             fit: BoxFit.cover,
+            cacheWidth: size == null ? 256 : (size! * 2).round().clamp(64, 512),
+            filterQuality: FilterQuality.medium,
             errorBuilder: (context, error, stack) => const _CoverFallback(),
             loadingBuilder: (context, child, progress) {
               if (progress == null) return child;
@@ -340,18 +380,21 @@ class AmbientBackdrop extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        const ColoredBox(color: AppColors.obsidian),
-        if (enabled) const _AuroraField(),
+        const RepaintBoundary(child: ColoredBox(color: AppColors.obsidian)),
+        if (enabled) const RepaintBoundary(child: _AuroraField()),
         if (enabled && coverUrl != null && coverUrl!.isNotEmpty)
-          Opacity(
-            opacity: 0.42,
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
-              child: Image.network(
-                coverUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stack) =>
-                    const SizedBox.shrink(),
+          RepaintBoundary(
+            child: Opacity(
+              opacity: 0.42,
+              child: ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: 48, sigmaY: 48),
+                child: Image.network(
+                  coverUrl!,
+                  fit: BoxFit.cover,
+                  cacheWidth: 128,
+                  errorBuilder: (context, error, stack) =>
+                      const SizedBox.shrink(),
+                ),
               ),
             ),
           ),
@@ -590,14 +633,6 @@ class ChoicePill extends StatelessWidget {
   }
 }
 
-String _playlistMeta(PlaylistSummary playlist) {
-  final parts = <String>[
-    if (playlist.authorName.isNotEmpty) playlist.authorName,
-    if (playlist.description.isNotEmpty) playlist.description,
-  ];
-  return parts.join(' · ');
-}
-
 class PlaylistCard extends StatelessWidget {
   const PlaylistCard({
     required this.playlist,
@@ -647,32 +682,20 @@ class PlaylistCard extends StatelessWidget {
                 playlist.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleLarge
-                    ?.copyWith(fontSize: 20, height: 1.05),
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  height: 1.2,
+                  color: AppColors.ivory,
+                ),
               ),
-              if (_playlistMeta(playlist).isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  _playlistMeta(playlist),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(99),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.14),
-                  ),
-                ),
-                child: Text(
-                  '${playlist.trackCount} tracks · ${playlist.statusLabel}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+              const SizedBox(height: 4),
+              Text(
+                '${playlist.trackCount} tracks',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
           ),
@@ -1122,9 +1145,14 @@ class TrackRow extends ConsumerWidget {
               ),
               PopupMenuButton<String>(
                 tooltip: 'Track actions',
+                popUpAnimationStyle: AnimationStyle.noAnimation,
                 onSelected: (value) => _action(context, ref, value),
                 itemBuilder: (context) => [
                   const PopupMenuItem(value: 'next', child: Text('Play next')),
+                  const PopupMenuItem(
+                    value: 'server_link',
+                    child: Text('Server link (RöcsögeCloud)'),
+                  ),
                   const PopupMenuItem(
                     value: 'queue',
                     child: Text('Add to queue'),
@@ -1180,6 +1208,11 @@ class TrackRow extends ConsumerWidget {
     if (value == 'playlist') {
       if (!context.mounted) return;
       await _addToPlaylist(context, ref);
+      return;
+    }
+    if (value == 'server_link') {
+      if (!context.mounted) return;
+      await copyServerLink(context, ref, track);
       return;
     }
     if (value == 'pin') {
@@ -1303,6 +1336,7 @@ class _DetailsDialog extends ConsumerWidget {
       if (track.file.relativePath.isNotEmpty) track.file.relativePath,
       if (track.isrc.isNotEmpty) 'ISRC ${track.isrc}',
     ];
+    final link = serverLinkFor(track, ref.watch(settingsProvider).cloudBaseUrl);
     return AlertDialog(
       title: Text(track.title, style: Theme.of(context).textTheme.titleLarge),
       content: Column(
@@ -1314,9 +1348,20 @@ class _DetailsDialog extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(line),
             ),
+          if (link != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(link),
+            ),
         ],
       ),
       actions: [
+        if (link != null)
+          GlassActionButton(
+            label: 'Copy server link',
+            icon: Icons.link_rounded,
+            onPressed: () => unawaited(copyServerLink(context, ref, track)),
+          ),
         GlassActionButton(
           label: 'Close',
           icon: Icons.close_rounded,
@@ -1325,6 +1370,33 @@ class _DetailsDialog extends ConsumerWidget {
       ],
     );
   }
+}
+
+Future<void> copyServerLink(
+  BuildContext context,
+  WidgetRef ref,
+  TrackRecord track,
+) async {
+  final url = serverLinkFor(track, ref.read(settingsProvider).cloudBaseUrl);
+  if (url == null || url.isEmpty) {
+    showNote(context, 'No server link for ${track.title}.');
+    return;
+  }
+  await Clipboard.setData(ClipboardData(text: url));
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text('Copied server link: $url'),
+      action: SnackBarAction(
+        label: 'Open',
+        onPressed: () {
+          final uri = Uri.tryParse(url);
+          if (uri == null) return;
+          unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
+        },
+      ),
+    ),
+  );
 }
 
 Future<String?> promptText(
@@ -1383,6 +1455,7 @@ class KeptIconGlyphs extends StatelessWidget {
     Icons.repeat_rounded,
     Icons.repeat_one_rounded,
     Icons.lyrics_outlined,
+    Icons.lyrics_rounded,
     Icons.open_in_full_rounded,
     Icons.equalizer_rounded,
     Icons.queue_music_rounded,

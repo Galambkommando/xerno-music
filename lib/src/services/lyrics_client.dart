@@ -1,9 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 
 import '../constants.dart';
 import '../logic/lrc.dart';
-import '../models/json_util.dart';
 import 'http_get.dart';
 
 class LyricsClient {
@@ -30,12 +28,11 @@ class LyricsClient {
     });
     final exactResponse = await _http.get(exact, headers: headers);
     if (exactResponse.ok) {
-      final lyrics = Lyrics.fromLrclib(asMap(jsonDecode(exactResponse.body)));
-      _cache[trackId] = lyrics;
-      return lyrics;
-    }
-    if (exactResponse.status != 404) {
-      throw HttpException('LRCLIB returned ${exactResponse.status}.');
+      final lyrics = _decode(exactResponse.body);
+      if (lyrics != null && !lyrics.isEmpty) {
+        _cache[trackId] = lyrics;
+        return lyrics;
+      }
     }
     final search = Uri.https(kLrclibHost, '/api/search', {
       'track_name': title,
@@ -49,5 +46,15 @@ class LyricsClient {
     final lyrics = closest == null ? Lyrics.empty : Lyrics.fromLrclib(closest);
     _cache[trackId] = lyrics;
     return lyrics;
+  }
+
+  Lyrics? _decode(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map) return null;
+      return Lyrics.fromLrclib(decoded.cast<String, Object?>());
+    } catch (_) {
+      return null;
+    }
   }
 }

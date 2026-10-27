@@ -8,10 +8,13 @@ import 'package:xerno_music/src/logic/lrc.dart';
 import 'package:xerno_music/src/logic/play_queue.dart';
 import 'package:xerno_music/src/logic/source_resolver.dart';
 import 'package:xerno_music/src/logic/track_query.dart';
+import 'package:xerno_music/src/models/library.dart';
 import 'package:xerno_music/src/models/settings.dart';
 import 'package:xerno_music/src/models/sync.dart';
 import 'package:xerno_music/src/models/track.dart';
 import 'package:xerno_music/src/models/user_library.dart';
+import 'package:xerno_music/src/services/http_get.dart';
+import 'package:xerno_music/src/services/lyrics_client.dart';
 
 void main() {
   group('play queue', () {
@@ -134,6 +137,59 @@ void main() {
       );
     });
 
+    test('main artists lead by appearance and hide one-off features', () {
+      final index = LibraryIndex(
+        const LibraryManifest(
+          tracks: [
+            TrackRecord(
+              id: '1',
+              title: 'A',
+              artist: 'Kanye West',
+              artists: ['Kanye West', '88-Keys'],
+              albumArtist: 'Kanye West',
+              album: 'Late Registration',
+            ),
+            TrackRecord(
+              id: '2',
+              title: 'B',
+              artist: 'Kanye West',
+              artists: ['Kanye West'],
+              albumArtist: 'Kanye West',
+              album: 'Graduation',
+            ),
+            TrackRecord(
+              id: '3',
+              title: 'C',
+              artist: 'ILLIT',
+              artists: ['ILLIT'],
+              albumArtist: 'ILLIT',
+              album: 'SUPER REAL ME',
+            ),
+          ],
+        ),
+      );
+      final main = index.listedArtists();
+      expect(main.map((group) => group.name).toList(), ['Kanye West', 'ILLIT']);
+      expect(main.first.trackCount, 2);
+      expect(main.first.albumCount, 2);
+      final all = index.listedArtists(mainOnly: false);
+      expect(all.map((group) => group.name), contains('88-Keys'));
+      expect(index.creditArtistCount, 3);
+      final alpha = index.listedArtists(alphabetical: true);
+      expect(alpha.first.name, 'ILLIT');
+      expect(
+        lyricLineProgress(
+          const [
+            LyricLine(Duration(seconds: 1), 'One'),
+            LyricLine(Duration(seconds: 3), 'Two'),
+          ],
+          0,
+          const Duration(seconds: 2),
+        ),
+        0.5,
+      );
+    });
+
     test('keeps unknown years last while sorting', () {
       const tracks = [
         TrackRecord(
@@ -251,4 +307,39 @@ void main() {
       expect(mapEqGain(1, 2, const [0, 10]), closeTo(10, 0.001));
     });
   });
+
+  test('lyrics search runs when the exact lookup is overloaded', () async {
+    final client = LyricsClient(
+      _ScriptedHttp({
+        '/api/get': const HttpText(
+          status: 503,
+          body: '{"statusCode":503,"name":"ServerOverloaded"}',
+        ),
+        '/api/search': const HttpText(
+          status: 200,
+          body: '[{"trackName":"Bound 2","duration":230,"syncedLyrics":"[00:01.00] Bound to fall in love\\n[00:08.00] All them other lines"}]',
+        ),
+      }),
+    );
+    final lyrics = await client.fetch(
+      trackId: 'bound-2',
+      title: 'Bound 2',
+      artist: 'Kanye West',
+      album: 'Def Jam Classics (Volume 1)',
+      durationSec: 230,
+    );
+    expect(lyrics.hasSynced, isTrue);
+    expect(lyrics.synced.first.text, 'Bound to fall in love');
+  });
+}
+
+class _ScriptedHttp implements HttpGet {
+  _ScriptedHttp(this.bodies);
+
+  final Map<String, HttpText> bodies;
+
+  @override
+  Future<HttpText> get(Uri uri, {Map<String, String>? headers}) async {
+    return bodies[uri.path] ?? const HttpText(status: 500, body: '');
+  }
 }

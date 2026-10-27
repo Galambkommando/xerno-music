@@ -4,7 +4,6 @@ import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../format.dart';
-import '../logic/lrc.dart';
 import '../logic/play_queue.dart';
 import '../player/desktop_window.dart';
 import '../player/playback.dart';
@@ -12,6 +11,7 @@ import '../state/providers.dart';
 import '../theme/app_theme.dart';
 import 'playback_actions.dart';
 import 'sound_controls.dart';
+import 'spicy_lyrics.dart';
 import 'widgets.dart';
 
 class PlaybackFailureBanner extends ConsumerWidget {
@@ -62,9 +62,10 @@ class NowPlayingSlot extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: GlassSurface(
         frosted: frosted,
+        blur: true,
         radius: 18,
         shadow: true,
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
         child: NowPlayingBar(snapshot: snapshot),
       ),
     );
@@ -156,6 +157,12 @@ class _CompactBar extends ConsumerWidget {
               onPressed: track == null
                   ? null
                   : () => unawaited(ref.read(playerProvider).next()),
+            ),
+            const SizedBox(width: 4),
+            GlassIconButton(
+              tooltip: 'Now Playing & Lyrics',
+              icon: Icons.lyrics_rounded,
+              onPressed: () => openNowPlaying(context),
             ),
             const SizedBox(width: 4),
             GlassIconButton(
@@ -359,15 +366,8 @@ class _Tools extends ConsumerWidget {
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         GlassIconButton(
-          tooltip: 'Lyrics',
-          icon: Icons.lyrics_outlined,
-          size: 32,
-          onPressed: () => openNowPlaying(context),
-        ),
-        const SizedBox(width: 2),
-        GlassIconButton(
-          tooltip: 'Now playing',
-          icon: Icons.open_in_full_rounded,
+          tooltip: 'Now Playing & Lyrics',
+          icon: Icons.lyrics_rounded,
           size: 32,
           onPressed: () => openNowPlaying(context),
         ),
@@ -698,64 +698,91 @@ void openNowPlaying(BuildContext context) {
   );
 }
 
-class NowPlayingScreen extends ConsumerWidget {
+class NowPlayingScreen extends ConsumerStatefulWidget {
   const NowPlayingScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NowPlayingScreen> createState() => _NowPlayingScreenState();
+}
+
+class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
+  LyricsLayout? _layout;
+
+  LyricsLayout _modeFor(double width) {
+    return _layout ?? (width >= 980 ? LyricsLayout.split : LyricsLayout.focus);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final snapshot = watchSnapshot(ref);
-    final settings = ref.watch(settingsProvider);
     final track = snapshot.track;
     final player = ref.read(playerProvider);
-    final wide = MediaQuery.sizeOf(context).width >= 980;
+    final width = MediaQuery.sizeOf(context).width;
+    final mode = _modeFor(width);
+    final cover = track?.artUri?.toString();
     return Scaffold(
-      body: AmbientBackdrop(
-        enabled: settings.ambientGlow,
-        coverUrl: track?.artUri?.toString(),
+      backgroundColor: Colors.transparent,
+      body: SpicyDynamicBackground(
+        coverUrl: cover,
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
             child: Column(
               children: [
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    IconButton(
+                    GlassIconButton(
                       tooltip: 'Close',
+                      icon: Icons.keyboard_arrow_down_rounded,
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded),
                     ),
-                    const Spacer(),
+                    _LayoutPill(
+                      label: 'Split View',
+                      selected: mode == LyricsLayout.split,
+                      onTap: () => setState(() => _layout = LyricsLayout.split),
+                    ),
+                    _LayoutPill(
+                      label: 'Focus Lyrics',
+                      selected: mode == LyricsLayout.focus,
+                      onTap: () => setState(() => _layout = LyricsLayout.focus),
+                    ),
+                    _LayoutPill(
+                      label: 'Cover Stage',
+                      selected: mode == LyricsLayout.stage,
+                      onTap: () => setState(() => _layout = LyricsLayout.stage),
+                    ),
                     if (snapshot.sourceLabel != null)
                       SourceBadge(snapshot.sourceLabel!),
-                    IconButton(
+                    if (track != null)
+                      GlassIconButton(
+                        tooltip: 'Server link (RöcsögeCloud)',
+                        icon: Icons.link_rounded,
+                        onPressed: () {
+                          final record = ref
+                              .read(libraryProvider)
+                              .valueOrNull
+                              ?.byId[track.id];
+                          if (record == null) return;
+                          unawaited(copyServerLink(context, ref, record));
+                        },
+                      ),
+                    GlassIconButton(
                       tooltip: 'Sound',
+                      icon: Icons.tune_rounded,
                       onPressed: () => showSoundSheet(context, ref),
-                      icon: const Icon(Icons.tune_rounded),
                     ),
-                    IconButton(
+                    GlassIconButton(
                       tooltip: 'Queue',
+                      icon: Icons.queue_music_rounded,
                       onPressed: () => showQueueSheet(context),
-                      icon: const Icon(Icons.queue_music_rounded),
                     ),
                   ],
                 ),
-                Expanded(
-                  child: wide
-                      ? Row(
-                          children: [
-                            Expanded(child: _Stage(snapshot: snapshot)),
-                            const SizedBox(width: 28),
-                            Expanded(child: _LyricsPane(snapshot: snapshot)),
-                          ],
-                        )
-                      : Column(
-                          children: [
-                            _Stage(snapshot: snapshot, compact: true),
-                            const SizedBox(height: 8),
-                            Expanded(child: _LyricsPane(snapshot: snapshot)),
-                          ],
-                        ),
-                ),
+                const SizedBox(height: 12),
+                Expanded(child: _stageBody(snapshot, mode)),
                 const SizedBox(height: 8),
                 SeekBar(
                   position: snapshot.position,
@@ -829,6 +856,71 @@ class NowPlayingScreen extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _stageBody(PlayerSnapshot snapshot, LyricsLayout mode) {
+    final stage = _Stage(
+      snapshot: snapshot,
+      compact: mode != LyricsLayout.stage,
+    );
+    final lyrics = _LyricsPane(
+      snapshot: snapshot,
+      onSeek: (position) => unawaited(ref.read(playerProvider).seek(position)),
+    );
+    return switch (mode) {
+      LyricsLayout.stage => stage,
+      LyricsLayout.focus => lyrics,
+      LyricsLayout.split => Row(
+        children: [
+          Expanded(child: stage),
+          const SizedBox(width: 28),
+          Expanded(child: lyrics),
+        ],
+      ),
+    };
+  }
+}
+
+class _LayoutPill extends StatelessWidget {
+  const _LayoutPill({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(99),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.accent.withValues(alpha: 0.72)
+              : Colors.black.withValues(alpha: 0.28),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(
+            color: selected
+                ? AppColors.mint
+                : Colors.white.withValues(alpha: 0.18),
+          ),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+            color: AppColors.ivory,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _Stage extends StatelessWidget {
@@ -876,9 +968,10 @@ class _Stage extends StatelessWidget {
 }
 
 class _LyricsPane extends ConsumerWidget {
-  const _LyricsPane({required this.snapshot});
+  const _LyricsPane({required this.snapshot, required this.onSeek});
 
   final PlayerSnapshot snapshot;
+  final ValueChanged<Duration> onSeek;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -891,109 +984,11 @@ class _LyricsPane extends ConsumerWidget {
       loading: () => const Center(child: Text('Looking up lyrics')),
       error: (error, _) =>
           const Center(child: Text('Lyrics are unavailable right now.')),
-      data: (value) {
-        if (value.instrumental) {
-          return const Center(child: Text('Instrumental'));
-        }
-        if (value.hasSynced) {
-          return _SyncedLyrics(
-            lines: value.synced,
-            position: snapshot.position,
-          );
-        }
-        if (value.plain != null) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Text(
-              value.plain!,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-          );
-        }
-        return const Center(
-          child: Text('LRCLIB has no lyrics for this track yet.'),
-        );
-      },
-    );
-  }
-}
-
-class _SyncedLyrics extends StatefulWidget {
-  const _SyncedLyrics({required this.lines, required this.position});
-
-  final List<LyricLine> lines;
-  final Duration position;
-
-  @override
-  State<_SyncedLyrics> createState() => _SyncedLyricsState();
-}
-
-class _SyncedLyricsState extends State<_SyncedLyrics> {
-  final _controller = ScrollController();
-  int _shown = -2;
-
-  @override
-  void didUpdateWidget(_SyncedLyrics oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _reveal();
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
-  }
-
-  void _reveal() {
-    final index = activeLyricIndex(widget.lines, widget.position);
-    if (index == _shown || !_controller.hasClients) return;
-    _shown = index;
-    final target =
-        (index * 48.0) - (_controller.position.viewportDimension / 2) + 24;
-    final max = _controller.position.maxScrollExtent;
-    _controller.animateTo(
-      target.clamp(0, max),
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final active = activeLyricIndex(widget.lines, widget.position);
-    return ListView.builder(
-      controller: _controller,
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      itemCount: widget.lines.length,
-      itemBuilder: (context, index) {
-        final line = widget.lines[index];
-        final current = index == active;
-        return SizedBox(
-          height: 48,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              line.text,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: 'Newsreader',
-                fontSize: current ? 26 : 18,
-                height: 1.15,
-                color: current
-                    ? AppColors.ivory
-                    : AppColors.sage.withValues(alpha: 0.72),
-              ),
-            ),
-          ),
-        );
-      },
+      data: (value) => SpicyLyricsPane(
+        lyrics: value,
+        position: snapshot.position,
+        onSeek: onSeek,
+      ),
     );
   }
 }
@@ -1018,9 +1013,10 @@ class _QueueSheet extends ConsumerWidget {
     final height = MediaQuery.sizeOf(context).height * 0.72;
     return GlassSurface(
       frosted: frosted,
+      blur: true,
       color: AppColors.surface,
       radius: 20,
-      border: Border.all(color: AppColors.border),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
       child: SizedBox(
         height: height,
         child: Column(
@@ -1092,9 +1088,10 @@ Future<void> showSoundSheet(BuildContext context, WidgetRef ref) {
     isScrollControlled: true,
     builder: (context) => GlassSurface(
       frosted: frosted,
+      blur: true,
       color: AppColors.surface,
       radius: 20,
-      border: Border.all(color: AppColors.border),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
       child: DraggableScrollableSheet(
         expand: false,
         initialChildSize: 0.72,
