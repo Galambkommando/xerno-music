@@ -174,7 +174,9 @@ class AppSettings {
       resumeOnLaunch: asBool(map['resume_on_launch']),
       liveSync: asBool(map['live_sync']),
       deviceId: asString(map['device_id']),
-      miniPlayer: asBool(map['mini_player']),
+      // Mini player is session-only. A saved true value would reopen the
+      // compact window with no way back to the library.
+      miniPlayer: false,
     );
   }
 }

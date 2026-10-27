@@ -78,9 +78,10 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                 ),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton(
+                  child: GlassActionButton(
+                    label: 'Cancel',
+                    icon: Icons.close_rounded,
                     onPressed: manager.requestCancel,
-                    child: const Text('Cancel'),
                   ),
                 ),
               ],
@@ -95,7 +96,7 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 148),
                   itemCount: ids.length,
                   itemBuilder: (context, index) {
                     final id = ids[index];

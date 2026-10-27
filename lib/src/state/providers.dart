@@ -227,10 +227,30 @@ PlayerSnapshot watchSnapshot(WidgetRef ref) {
       ref.read(playerProvider).snapshot;
 }
 
+/// Cover used behind the shell. Selects the art string so position ticks
+/// do not rebuild the whole window.
+final ambientCoverProvider = Provider<String?>((ref) {
+  final art = ref.watch(
+    playerSnapshotProvider.select((value) {
+      final uri = value.valueOrNull?.track?.artUri?.toString();
+      if (uri == null || uri.isEmpty) return null;
+      return uri;
+    }),
+  );
+  if (art != null) return art;
+  final playlists = ref.watch(
+    libraryProvider.select((value) => value.valueOrNull?.manifest.playlists),
+  );
+  if (playlists == null) return null;
+  for (final playlist in playlists) {
+    final cover = playlist.coverUrl;
+    if (cover != null && cover.isNotEmpty) return cover;
+  }
+  return null;
+});
+
 final downloadManagerProvider = ChangeNotifierProvider<DownloadManager>((ref) {
-  final manager = DownloadManager();
-  ref.onDispose(manager.dispose);
-  return manager;
+  return DownloadManager();
 });
 
 final sourceResolverProvider = Provider<SourceResolver>(

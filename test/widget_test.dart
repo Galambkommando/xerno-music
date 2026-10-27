@@ -8,6 +8,8 @@ import 'package:xerno_music/src/models/settings.dart';
 import 'package:xerno_music/src/models/track.dart';
 import 'package:xerno_music/src/player/playback.dart';
 import 'package:xerno_music/src/state/providers.dart';
+import 'package:xerno_music/src/ui/shell.dart';
+import 'package:xerno_music/src/ui/widgets.dart';
 
 LibraryIndex fixtureCatalog() {
   return LibraryIndex(
@@ -68,8 +70,14 @@ void main() {
   testWidgets('desktop home opens a premade playlist', (tester) async {
     await pumpApp(tester, const Size(1440, 900));
     expect(find.text('Xerno'), findsWidgets);
-    expect(find.textContaining('Liked Songs'), findsOneWidget);
-    await tester.tap(find.textContaining('ILLIT'));
+    expect(find.textContaining('Liked Songs'), findsWidgets);
+    expect(find.text('Ready to play'), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(PlaylistCard),
+        matching: find.textContaining('ILLIT'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Nothing matches this view yet.'), findsOneWidget);
   });
@@ -96,12 +104,46 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Xerno'), findsWidgets);
     expect(find.text(kMissingLibmpvMessage), findsOneWidget);
-    expect(find.textContaining('Liked Songs'), findsOneWidget);
+    expect(find.textContaining('Liked Songs'), findsWidgets);
+    expect(find.text('Ready to play'), findsOneWidget);
   });
 
   testWidgets('phone home keeps the masthead', (tester) async {
     await pumpApp(tester, const Size(390, 844));
     expect(find.text('Xerno'), findsOneWidget);
     expect(find.textContaining('Liked Songs'), findsOneWidget);
+    expect(find.text('Ready to play'), findsOneWidget);
+  });
+
+  testWidgets('expand leaves mini player mode', (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          initialSettingsProvider.overrideWithValue(
+            AppSettings(deviceId: 'test-device', miniPlayer: true),
+          ),
+          playerProvider.overrideWithValue(ManualPlayback()),
+          librarySeedProvider.overrideWithValue(fixtureCatalog()),
+        ],
+        child: const XernoApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Expand to full window'), findsOneWidget);
+    expect(find.text('Expand'), findsOneWidget);
+    expect(find.text('Ready to play'), findsNothing);
+    await tester.tap(find.byTooltip('Expand to full window'));
+    await tester.pumpAndSettle();
+    final context = tester.element(find.byType(XernoShell));
+    expect(
+      ProviderScope.containerOf(context).read(settingsProvider).miniPlayer,
+      isFalse,
+    );
+    expect(find.textContaining('Liked Songs'), findsWidgets);
+    expect(find.text('Ready to play'), findsOneWidget);
   });
 }

@@ -28,7 +28,7 @@ Pin a track, or a whole playlist, to download the MP3 into the app's offline fol
 
 - Linux uses libmpv through `just_audio` and publishes an MPRIS interface (`org.mpris.MediaPlayer2.xernomusic`) so media keys and desktop applets can control it. If `mpv` is not installed the window still opens and shows `sudo pacman -S mpv`. The release build draws with Skia so the window maps on Wayland. `XERNO_ENABLE_IMPELLER=1` turns Impeller back on.
 - Android keeps a foreground media notification and lock-screen controls.
-- The Linux mini-player toggle asks the window to stay above other windows and shrink to a compact size.
+- The Linux mini-player toggle asks the window to stay above other windows and shrink to a compact size. Mini mode is session-only: the next launch always opens the full window, and Expand (or Escape) returns immediately.
 - Lyrics are requested from [LRCLIB](https://lrclib.net/api/get) and fall back to a plain text version. Synced lines follow the playhead.
 - Crossfade runs from 0 to 12 seconds. Speed and pitch apply on both platforms. The five-band equalizer is applied by Android's audio effect; on Linux the bands are stored with the rest of the settings.
 - Sleep can be 15, 30, 45, or 60 minutes, or the end of the current track.
