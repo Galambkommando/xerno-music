@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Xerno Music
+Comment=Editorial player for the Xernover library
+Exec=xerno-music
+Icon=xerno-music
+Terminal=false
+Type=Application
+Categories=AudioVideo;Audio;Player;
+StartupWMClass=online.mucsarocsoge.xerno_music
+StartupNotify=true
