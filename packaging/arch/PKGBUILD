@@ -1,0 +1,33 @@
+# Maintainer: Xernover
+# Build from a git checkout:
+#   cd packaging/arch && makepkg -si
+pkgname=xerno-music
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Editorial music player for the Xernover library"
+arch=('x86_64')
+url="https://github.com/Galambkommando/xerno-music"
+license=('MIT')
+depends=('gtk3' 'libmpv' 'mpv' 'libsecret' 'zenity')
+makedepends=('flutter' 'clang' 'cmake' 'ninja' 'pkgconf')
+options=('!strip')
+
+build() {
+  cd "$startdir/../.."
+  flutter pub get
+  flutter build linux --release
+}
+
+package() {
+  cd "$startdir/../.."
+  install -dm755 "$pkgdir/opt/xerno-music"
+  cp -a build/linux/x64/release/bundle/. "$pkgdir/opt/xerno-music/"
+  install -dm755 "$pkgdir/usr/bin"
+  ln -s /opt/xerno-music/xerno_music "$pkgdir/usr/bin/xerno-music"
+  install -Dm644 packaging/linux/online.mucsarocsoge.xerno_music.desktop \
+    "$pkgdir/usr/share/applications/online.mucsarocsoge.xerno_music.desktop"
+  install -Dm644 assets/icons/xerno.png \
+    "$pkgdir/usr/share/icons/hicolor/1024x1024/apps/xerno-music.png"
+  install -Dm644 assets/icons/xerno-256.png \
+    "$pkgdir/usr/share/icons/hicolor/256x256/apps/xerno-music.png"
+}

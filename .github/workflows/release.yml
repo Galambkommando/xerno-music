@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  linux:
+    name: Linux tar.gz and AppImage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libmpv-dev mpv libsecret-1-dev liblzma-dev libfuse2 curl
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter config --no-analytics --enable-linux-desktop
+      - run: flutter pub get
+      - run: flutter build linux --release
+      - name: Pack tar.gz and AppImage
+        env:
+          VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '1.0.0' }}
+        run: |
+          mkdir -p dist
+          tar -C build/linux/x64/release/bundle -czf "dist/XernoMusic-${VERSION}-linux-x86_64.tar.gz" .
+          chmod +x packaging/linux/make_appimage.sh
+          if ! packaging/linux/make_appimage.sh build/linux/x64/release/bundle "$VERSION" dist; then
+            echo "AppImage tooling failed. The tar.gz is still published."
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-release
+          path: |
+            dist/*.tar.gz
+            dist/*.AppImage
+          if-no-files-found: error
+
+  android:
+    name: Android APKs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter config --no-analytics
+      - run: flutter pub get
+      - run: flutter build apk --release --split-per-abi
+      - name: Collect split APKs
+        env:
+          VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '1.0.0' }}
+        run: |
+          mkdir -p dist
+          cd build/app/outputs/flutter-apk
+          for file in app-*-release.apk; do
+            abi="${file#app-}"
+            abi="${abi%-release.apk}"
+            cp "$file" "$GITHUB_WORKSPACE/dist/XernoMusic-${VERSION}-android-${abi}.apk"
+          done
+      - run: flutter build apk --release
+      - name: Collect the universal APK
+        env:
+          VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '1.0.0' }}
+        run: cp build/app/outputs/flutter-apk/app-release.apk "dist/XernoMusic-${VERSION}-android-universal.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-release
+          path: dist/*.apk
+          if-no-files-found: error
+
+  publish:
+    name: GitHub Release
+    needs: [linux, android]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
+          name: Xerno Music ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
+          prerelease: ${{ github.ref_type != 'tag' }}
+          generate_release_notes: true
+          files: release/*
+          fail_on_unmatched_files: true
