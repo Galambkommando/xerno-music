@@ -20,6 +20,7 @@ class GlassSurface extends StatelessWidget {
     this.color = AppColors.surface,
     this.border,
     this.radius = 0,
+    this.shadow = false,
     super.key,
   });
 
@@ -28,24 +29,250 @@ class GlassSurface extends StatelessWidget {
   final Color color;
   final BoxBorder? border;
   final double radius;
+  final bool shadow;
 
   @override
   Widget build(BuildContext context) {
-    final decoration = BoxDecoration(
-      color: frosted ? color.withValues(alpha: 0.72) : color,
-      borderRadius: BorderRadius.circular(radius),
-      border: border,
-    );
+    final radius = BorderRadius.circular(this.radius);
     if (!frosted) {
-      return DecoratedBox(decoration: decoration, child: child);
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: radius,
+          border: border,
+        ),
+        child: child,
+      );
     }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-        child: DecoratedBox(decoration: decoration, child: child),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: shadow
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.28),
+                  blurRadius: 28,
+                  offset: const Offset(0, 14),
+                ),
+              ]
+            : null,
+      ),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: 0.09),
+                  color.withValues(alpha: 0.68),
+                ],
+              ),
+              borderRadius: radius,
+              border:
+                  border ??
+                  Border.all(color: Colors.white.withValues(alpha: 0.14)),
+            ),
+            child: child,
+          ),
+        ),
       ),
     );
+  }
+}
+
+class PrimaryActionPill extends StatelessWidget {
+  const PrimaryActionPill({
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.tooltip,
+    super.key,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ActionPill(
+      label: label,
+      onPressed: onPressed,
+      icon: icon,
+      tooltip: tooltip,
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [AppColors.accent, AppColors.accentBright],
+      ),
+      foreground: AppColors.ivory,
+      border: Border.all(color: AppColors.mint.withValues(alpha: 0.85)),
+    );
+  }
+}
+
+class GlassActionButton extends StatelessWidget {
+  const GlassActionButton({
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.tooltip,
+    super.key,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ActionPill(
+      label: label,
+      onPressed: onPressed,
+      icon: icon,
+      tooltip: tooltip,
+      fill: Colors.white.withValues(alpha: 0.06),
+      foreground: AppColors.ivory,
+      border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+    );
+  }
+}
+
+class SecondaryActionPill extends GlassActionButton {
+  const SecondaryActionPill({
+    required super.label,
+    required super.onPressed,
+    super.icon,
+    super.tooltip,
+    super.key,
+  });
+}
+
+class GlassIconButton extends StatelessWidget {
+  const GlassIconButton({
+    required this.icon,
+    required this.onPressed,
+    this.tooltip,
+    this.active = false,
+    this.size = 34,
+    this.iconSize = 18,
+    super.key,
+  });
+
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final String? tooltip;
+  final bool active;
+  final double size;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final button = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: Ink(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: active
+                ? AppColors.accent.withValues(alpha: 0.55)
+                : Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: active
+                  ? AppColors.mint.withValues(alpha: 0.7)
+                  : Colors.white.withValues(alpha: 0.14),
+            ),
+          ),
+          child: Center(
+            child: Icon(
+              icon,
+              size: iconSize,
+              color: onPressed == null
+                  ? AppColors.sage.withValues(alpha: 0.45)
+                  : AppColors.ivory,
+            ),
+          ),
+        ),
+      ),
+    );
+    if (tooltip == null) return button;
+    return Tooltip(message: tooltip, child: button);
+  }
+}
+
+class _ActionPill extends StatelessWidget {
+  const _ActionPill({
+    required this.label,
+    required this.onPressed,
+    required this.foreground,
+    required this.border,
+    this.icon,
+    this.tooltip,
+    this.gradient,
+    this.fill,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+  final String? tooltip;
+  final Gradient? gradient;
+  final Color? fill;
+  final Color foreground;
+  final BoxBorder border;
+
+  @override
+  Widget build(BuildContext context) {
+    final button = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: fill,
+            gradient: gradient,
+            borderRadius: BorderRadius.circular(12),
+            border: border,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 16, color: foreground),
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'Outfit',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: onPressed == null
+                        ? foreground.withValues(alpha: 0.4)
+                        : foreground,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (tooltip == null) return button;
+    return Tooltip(message: tooltip, child: button);
   }
 }
 
@@ -113,12 +340,13 @@ class AmbientBackdrop extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        const ColoredBox(color: AppColors.background),
+        const ColoredBox(color: AppColors.obsidian),
+        if (enabled) const _AuroraField(),
         if (enabled && coverUrl != null && coverUrl!.isNotEmpty)
           Opacity(
-            opacity: 0.38,
+            opacity: 0.42,
             child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 70, sigmaY: 70),
+              imageFilter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
               child: Image.network(
                 coverUrl!,
                 fit: BoxFit.cover,
@@ -127,22 +355,99 @@ class AmbientBackdrop extends StatelessWidget {
               ),
             ),
           ),
-        const DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0x552D6A4F),
-                Color(0xCC0A0D0B),
-                AppColors.background,
-              ],
-              stops: [0, 0.42, 1],
+        IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AppColors.obsidian.withValues(alpha: enabled ? 0.15 : 0.72),
+                  AppColors.obsidian.withValues(alpha: enabled ? 0.28 : 0.84),
+                  AppColors.obsidian.withValues(alpha: enabled ? 0.55 : 0.92),
+                ],
+              ),
             ),
           ),
         ),
         child,
       ],
+    );
+  }
+}
+
+class _AuroraField extends StatelessWidget {
+  const _AuroraField();
+
+  @override
+  Widget build(BuildContext context) {
+    return const IgnorePointer(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _GlowOrb(
+            alignment: Alignment(-0.85, -0.75),
+            color: AppColors.glowDeep,
+            radius: 280,
+          ),
+          _GlowOrb(
+            alignment: Alignment(0.9, -0.4),
+            color: AppColors.accent,
+            radius: 240,
+          ),
+          _GlowOrb(
+            alignment: Alignment(0.15, 0.85),
+            color: AppColors.mint,
+            radius: 220,
+          ),
+          _GlowOrb(
+            alignment: Alignment(-0.2, 0.1),
+            color: AppColors.glowIvory,
+            radius: 180,
+            alpha: 0.16,
+          ),
+          _GlowOrb(
+            alignment: Alignment(0.55, 0.35),
+            color: AppColors.glowSoft,
+            radius: 160,
+            alpha: 0.14,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GlowOrb extends StatelessWidget {
+  const _GlowOrb({
+    required this.alignment,
+    required this.color,
+    required this.radius,
+    this.alpha = 0.55,
+  });
+
+  final Alignment alignment;
+  final Color color;
+  final double radius;
+  final double alpha;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: alignment,
+      child: Container(
+        width: radius,
+        height: radius,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [
+              color.withValues(alpha: alpha),
+              color.withValues(alpha: 0),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -285,44 +590,117 @@ class ChoicePill extends StatelessWidget {
   }
 }
 
+String _playlistMeta(PlaylistSummary playlist) {
+  final parts = <String>[
+    if (playlist.authorName.isNotEmpty) playlist.authorName,
+    if (playlist.description.isNotEmpty) playlist.description,
+  ];
+  return parts.join(' · ');
+}
+
 class PlaylistCard extends StatelessWidget {
-  const PlaylistCard({required this.playlist, required this.onTap, super.key});
+  const PlaylistCard({
+    required this.playlist,
+    required this.onTap,
+    this.onPlay,
+    this.frosted = true,
+    super.key,
+  });
 
   final PlaylistSummary playlist;
   final VoidCallback onTap;
+  final VoidCallback? onPlay;
+  final bool frosted;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    return GlassSurface(
+      frosted: frosted,
+      radius: 16,
+      shadow: true,
       color: AppColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.border),
-      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: CoverImage(url: playlist.coverUrl, radius: 12)),
-              const SizedBox(height: 14),
+              Expanded(
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: CoverImage(url: playlist.coverUrl, radius: 12),
+                    ),
+                    if (onPlay != null)
+                      Positioned(
+                        right: 8,
+                        bottom: 8,
+                        child: _CoverPlayButton(onPressed: onPlay!),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
               Text(
                 playlist.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleLarge
-                    ?.copyWith(fontSize: 22),
+                    ?.copyWith(fontSize: 20, height: 1.05),
               ),
-              const SizedBox(height: 6),
-              Text(
-                '${playlist.trackCount} tracks · ${playlist.statusLabel}',
-                style: Theme.of(context).textTheme.bodySmall,
+              if (_playlistMeta(playlist).isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  _playlistMeta(playlist),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.14),
+                  ),
+                ),
+                child: Text(
+                  '${playlist.trackCount} tracks · ${playlist.statusLabel}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CoverPlayButton extends StatelessWidget {
+  const _CoverPlayButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.accent,
+      shape: const CircleBorder(
+        side: BorderSide(color: AppColors.mint, width: 1.4),
+      ),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: const SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(Icons.play_arrow_rounded, color: AppColors.ivory),
         ),
       ),
     );
@@ -400,72 +778,97 @@ class _TrackBrowserState extends ConsumerState<TrackBrowser> {
       positions: widget.positions,
     );
     final wide = MediaQuery.sizeOf(context).width >= 900;
+    final frosted = ref.watch(settingsProvider).frostedGlass;
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(28, 28, 28, 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (widget.coverUrl != null) ...[
-                CoverImage(
-                  url: widget.coverUrl,
-                  size: wide ? 148 : 92,
-                  radius: 14,
-                ),
-                const SizedBox(width: 22),
-              ],
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Eyebrow(widget.eyebrow),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.title,
-                      style: Theme.of(context).textTheme.headlineMedium,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: GlassSurface(
+            frosted: frosted,
+            radius: 18,
+            shadow: true,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (widget.coverUrl != null) ...[
+                    CoverImage(
+                      url: widget.coverUrl,
+                      size: wide ? 132 : 84,
+                      radius: 14,
                     ),
-                    if (widget.subtitle != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.subtitle!,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                    const SizedBox(width: 18),
+                  ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Eyebrow(widget.eyebrow),
+                        const SizedBox(height: 8),
                         Text(
-                          '${filtered.length} tracks',
-                          style: AppTheme.tabular.copyWith(fontSize: 13),
+                          widget.title,
+                          style: Theme.of(context).textTheme.headlineMedium,
                         ),
-                        const SizedBox(width: 12),
-                        TextButton.icon(
-                          onPressed: () => _play(context, filtered, 0),
-                          icon: const Icon(
-                            Icons.play_arrow_rounded,
-                            color: AppColors.mint,
+                        if (widget.subtitle != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            widget.subtitle!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
-                          label: const Text('Play'),
+                        ],
+                        const SizedBox(height: 14),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              '${filtered.length} tracks',
+                              style: AppTheme.tabular.copyWith(fontSize: 13),
+                            ),
+                            PrimaryActionPill(
+                              label: 'Play',
+                              icon: Icons.play_arrow_rounded,
+                              onPressed: filtered.isEmpty
+                                  ? null
+                                  : () =>
+                                        unawaited(_play(context, filtered, 0)),
+                            ),
+                            GlassActionButton(
+                              label: 'Shuffle',
+                              icon: Icons.shuffle_rounded,
+                              onPressed: filtered.isEmpty
+                                  ? null
+                                  : () => unawaited(
+                                      _play(
+                                        context,
+                                        [...filtered]..shuffle(),
+                                        0,
+                                      ),
+                                    ),
+                            ),
+                            if (widget.onPinAll != null)
+                              GlassActionButton(
+                                label: 'Pin offline',
+                                icon: Icons.download_rounded,
+                                onPressed: widget.onPinAll,
+                              ),
+                            if (widget.trailing != null) widget.trailing!,
+                          ],
                         ),
-                        if (widget.onPinAll != null)
-                          TextButton.icon(
-                            onPressed: widget.onPinAll,
-                            icon: const Icon(Icons.download_outlined),
-                            label: const Text('Pin offline'),
-                          ),
-                        if (widget.trailing != null) widget.trailing!,
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             children: [
               Expanded(
@@ -481,28 +884,28 @@ class _TrackBrowserState extends ConsumerState<TrackBrowser> {
               const SizedBox(width: 12),
               PopupMenuButton<TrackSort>(
                 initialValue: _sort,
+                tooltip: 'Sort',
                 onSelected: (value) => setState(() => _sort = value),
                 itemBuilder: (context) => [
                   for (final entry in trackSortLabels.entries)
                     PopupMenuItem(value: entry.key, child: Text(entry.value)),
                 ],
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 12,
-                  ),
-                  child: Text(
-                    trackSortLabels[_sort] ?? 'Sort',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                child: IgnorePointer(
+                  child: GlassActionButton(
+                    label: trackSortLabels[_sort] ?? 'Sort',
+                    icon: Icons.sort_rounded,
+                    onPressed: () {},
                   ),
                 ),
               ),
-              IconButton(
+              const SizedBox(width: 8),
+              GlassActionButton(
+                label: _ascending ? 'Asc' : 'Desc',
+                icon: _ascending
+                    ? Icons.arrow_upward_rounded
+                    : Icons.arrow_downward_rounded,
                 tooltip: _ascending ? 'Ascending' : 'Descending',
                 onPressed: () => setState(() => _ascending = !_ascending),
-                icon: Icon(
-                  _ascending ? Icons.arrow_upward : Icons.arrow_downward,
-                ),
               ),
             ],
           ),
@@ -513,7 +916,7 @@ class _TrackBrowserState extends ConsumerState<TrackBrowser> {
               ? const Center(child: Text('Nothing matches this view yet.'))
               : widget.customPlaylistId == null
               ? ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 148),
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
                     final track = filtered[index];
@@ -525,7 +928,7 @@ class _TrackBrowserState extends ConsumerState<TrackBrowser> {
                   },
                 )
               : ReorderableListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 148),
                   buildDefaultDragHandles: false,
                   itemCount: filtered.length,
                   onReorderItem: (from, to) {
@@ -615,11 +1018,20 @@ class TrackRow extends ConsumerWidget {
     final active = snapshot.track?.id == track.id;
     final wide = MediaQuery.sizeOf(context).width >= 1100;
     return Material(
-      color: active ? AppColors.elevated : Colors.transparent,
-      borderRadius: BorderRadius.circular(10),
+      color: active
+          ? AppColors.accent.withValues(alpha: 0.38)
+          : Colors.white.withValues(alpha: 0.03),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: active
+              ? AppColors.mint.withValues(alpha: 0.55)
+              : Colors.white.withValues(alpha: 0.08),
+        ),
+      ),
       child: InkWell(
         onTap: onPlay,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: Row(
@@ -905,9 +1317,10 @@ class _DetailsDialog extends ConsumerWidget {
         ],
       ),
       actions: [
-        TextButton(
+        GlassActionButton(
+          label: 'Close',
+          icon: Icons.close_rounded,
           onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
         ),
       ],
     );
@@ -932,15 +1345,109 @@ Future<String?> promptText(
         onSubmitted: (value) => Navigator.pop(context, value),
       ),
       actions: [
-        TextButton(
+        GlassActionButton(
+          label: 'Cancel',
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
         ),
-        TextButton(
+        PrimaryActionPill(
+          label: confirm,
           onPressed: () => Navigator.pop(context, controller.text),
-          child: Text(confirm),
         ),
       ],
     ),
   );
+}
+
+/// Release builds subset the icon font to constant [IconData] values.
+/// Icons handed to buttons through a field are kept by this list.
+class KeptIconGlyphs extends StatelessWidget {
+  const KeptIconGlyphs({super.key});
+
+  static const List<IconData> icons = [
+    Icons.search_rounded,
+    Icons.play_arrow_rounded,
+    Icons.shuffle_rounded,
+    Icons.arrow_forward_rounded,
+    Icons.add_rounded,
+    Icons.file_download_outlined,
+    Icons.file_upload_outlined,
+    Icons.arrow_upward,
+    Icons.arrow_downward,
+    Icons.delete_outline_rounded,
+    Icons.info_outline,
+    Icons.skip_next_rounded,
+    Icons.skip_previous_rounded,
+    Icons.picture_in_picture_alt_rounded,
+    Icons.favorite_rounded,
+    Icons.favorite_border_rounded,
+    Icons.repeat_rounded,
+    Icons.repeat_one_rounded,
+    Icons.lyrics_outlined,
+    Icons.open_in_full_rounded,
+    Icons.equalizer_rounded,
+    Icons.queue_music_rounded,
+    Icons.volume_up_rounded,
+    Icons.volume_off_rounded,
+    Icons.pause_rounded,
+    Icons.keyboard_arrow_down_rounded,
+    Icons.tune_rounded,
+    Icons.pause_circle_filled_rounded,
+    Icons.play_circle_fill_rounded,
+    Icons.playlist_remove_rounded,
+    Icons.close_rounded,
+    Icons.arrow_back_rounded,
+    Icons.graphic_eq_rounded,
+    Icons.download_rounded,
+    Icons.sort_rounded,
+    Icons.arrow_upward_rounded,
+    Icons.arrow_downward_rounded,
+    Icons.drag_indicator,
+    Icons.favorite,
+    Icons.favorite_border,
+    Icons.more_horiz,
+    Icons.home_rounded,
+    Icons.library_music_rounded,
+    Icons.person_rounded,
+    Icons.album_rounded,
+    Icons.download_done_rounded,
+    Icons.home_outlined,
+    Icons.search,
+    Icons.queue_music_outlined,
+    Icons.download_outlined,
+    Icons.settings_outlined,
+    Icons.refresh_rounded,
+    Icons.inventory_2_outlined,
+    Icons.folder_open_rounded,
+    Icons.sync_rounded,
+    Icons.key_rounded,
+    Icons.copy_rounded,
+    Icons.upload_rounded,
+    Icons.visibility_outlined,
+    Icons.visibility_off_outlined,
+    Icons.link_rounded,
+    Icons.login_rounded,
+    Icons.person_add_alt_rounded,
+    Icons.mark_email_unread_outlined,
+    Icons.logout_rounded,
+    Icons.merge_type_rounded,
+    Icons.swap_horiz_rounded,
+    Icons.delete_outline,
+    Icons.close,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return _IconAnchor(icons);
+  }
+}
+
+class _IconAnchor extends StatelessWidget {
+  const _IconAnchor(this.icons);
+
+  final List<IconData> icons;
+
+  @override
+  Widget build(BuildContext context) {
+    return Offstage(child: Text('${icons.length}'));
+  }
 }

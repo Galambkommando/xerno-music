@@ -11,8 +11,8 @@ class DesktopWindow {
     try {
       await _channel.invokeMethod<void>('setAlwaysOnTop', mini);
       await _channel.invokeMethod<void>('resize', {
-        'width': mini ? 440 : 1280,
-        'height': mini ? 176 : 840,
+        'width': mini ? 640 : 1280,
+        'height': mini ? 220 : 840,
       });
     } catch (_) {}
   }

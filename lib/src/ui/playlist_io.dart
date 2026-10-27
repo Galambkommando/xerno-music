@@ -10,6 +10,19 @@ import '../models/user_library.dart';
 import '../platform_info.dart';
 import '../state/providers.dart';
 import 'playback_actions.dart';
+import 'widgets.dart';
+
+Future<void> createUserPlaylist(BuildContext context, WidgetRef ref) async {
+  final name = await promptText(
+    context,
+    title: 'New playlist',
+    confirm: 'Create',
+  );
+  if (!context.mounted || name == null || name.trim().isEmpty) return;
+  await ref
+      .read(userLibraryProvider.notifier)
+      .mutate((current) => current.addPlaylist(name));
+}
 
 Future<void> exportUserLibrary(BuildContext context, WidgetRef ref) async {
   final data = ref.read(userLibraryProvider).valueOrNull;
@@ -73,17 +86,19 @@ Future<void> importUserLibrary(BuildContext context, WidgetRef ref) async {
           'Merge adds the imported favorites and tracks onto this device. Replace writes the imported favorites and playlists over this device\'s copies.',
         ),
         actions: [
-          TextButton(
+          GlassActionButton(
+            label: 'Cancel',
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
           ),
-          TextButton(
+          GlassActionButton(
+            label: 'Merge',
+            icon: Icons.merge_type_rounded,
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Merge'),
           ),
-          TextButton(
+          PrimaryActionPill(
+            label: 'Replace',
+            icon: Icons.swap_horiz_rounded,
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Replace'),
           ),
         ],
       ),

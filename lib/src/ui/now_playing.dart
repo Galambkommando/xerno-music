@@ -6,9 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../format.dart';
 import '../logic/lrc.dart';
 import '../logic/play_queue.dart';
+import '../player/desktop_window.dart';
 import '../player/playback.dart';
 import '../state/providers.dart';
 import '../theme/app_theme.dart';
+import 'playback_actions.dart';
 import 'sound_controls.dart';
 import 'widgets.dart';
 
@@ -53,13 +55,18 @@ class NowPlayingSlot extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final snapshot = watchSnapshot(ref);
-    if (!snapshot.hasTrack) return const SizedBox.shrink();
-    final frosted = ref.watch(settingsProvider).frostedGlass;
-    return GlassSurface(
-      frosted: frosted,
-      color: AppColors.surface,
-      border: const Border(top: BorderSide(color: AppColors.border)),
-      child: NowPlayingBar(snapshot: snapshot),
+    final frosted = ref.watch(
+      settingsProvider.select((settings) => settings.frostedGlass),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: GlassSurface(
+        frosted: frosted,
+        radius: 18,
+        shadow: true,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        child: NowPlayingBar(snapshot: snapshot),
+      ),
     );
   }
 }
@@ -71,104 +78,414 @@ class NowPlayingBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth >= 920) {
+            return _WideBar(snapshot: snapshot);
+          }
+          return _CompactBar(snapshot: snapshot);
+        },
+      ),
+    );
+  }
+}
+
+class _WideBar extends StatelessWidget {
+  const _WideBar({required this.snapshot});
+
+  final PlayerSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Expanded(flex: 5, child: _Identity(snapshot: snapshot)),
+            Expanded(flex: 4, child: _Transport(snapshot: snapshot)),
+            Expanded(flex: 4, child: _Tools(snapshot: snapshot, volume: true)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        _SeekLine(snapshot: snapshot),
+      ],
+    );
+  }
+}
+
+class _CompactBar extends ConsumerWidget {
+  const _CompactBar({required this.snapshot});
+
+  final PlayerSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final track = snapshot.track;
-    if (track == null) return const SizedBox.shrink();
-    final wide = MediaQuery.sizeOf(context).width >= 800;
-    final player = ref.read(playerProvider);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => openNowPlaying(context),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 12, 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  CoverImage(
-                    url: track.artUri?.toString(),
-                    size: 46,
-                    radius: 8,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          track.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontFamily: 'Outfit',
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.ivory,
-                          ),
-                        ),
-                        Text(
-                          track.artist,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (wide) ...[
-                    IconButton(
-                      tooltip: 'Previous',
-                      onPressed: () => unawaited(player.previous()),
-                      icon: const Icon(Icons.skip_previous_rounded),
-                    ),
-                  ],
-                  IconButton(
-                    tooltip: snapshot.playing ? 'Pause' : 'Play',
-                    onPressed: () => unawaited(player.toggle()),
-                    icon: Icon(
-                      snapshot.playing
-                          ? Icons.pause_rounded
-                          : Icons.play_arrow_rounded,
-                      color: AppColors.mint,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Next',
-                    onPressed: () => unawaited(player.next()),
-                    icon: const Icon(Icons.skip_next_rounded),
-                  ),
-                  if (wide)
-                    SizedBox(
-                      width: 120,
-                      child: Slider(
-                        value: snapshot.volume.clamp(0, 1).toDouble(),
-                        onChanged: (value) =>
-                            unawaited(player.setVolume(value)),
-                        onChangeEnd: (value) => unawaited(
-                          ref
-                              .read(settingsProvider.notifier)
-                              .update(
-                                (current) => current.copyWith(volume: value),
-                              ),
-                        ),
-                      ),
-                    ),
-                  IconButton(
-                    tooltip: 'Queue',
-                    onPressed: () => showQueueSheet(context),
-                    icon: const Icon(Icons.queue_music_rounded),
-                  ),
-                ],
-              ),
-              SeekBar(
-                position: snapshot.position,
-                duration: snapshot.duration == Duration.zero
-                    ? track.duration
-                    : snapshot.duration,
-                buffered: snapshot.buffered,
-                onSeek: (position) => unawaited(player.seek(position)),
-              ),
+    final mini = ref.watch(
+      settingsProvider.select((settings) => settings.miniPlayer),
+    );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            _CoverButton(snapshot: snapshot, size: 44),
+            const SizedBox(width: 8),
+            Expanded(child: _TitleBlock(snapshot: snapshot)),
+            if (track != null) ...[
+              const SizedBox(width: 4),
+              _FavoriteButton(trackId: track.id),
             ],
+            const SizedBox(width: 4),
+            _PlayButton(
+              playing: snapshot.playing,
+              tooltip: track == null
+                  ? 'Play library'
+                  : snapshot.playing
+                  ? 'Pause'
+                  : 'Play',
+              onPressed: () => unawaited(_toggleOrStart(ref, snapshot)),
+            ),
+            const SizedBox(width: 4),
+            GlassIconButton(
+              tooltip: 'Next',
+              icon: Icons.skip_next_rounded,
+              onPressed: track == null
+                  ? null
+                  : () => unawaited(ref.read(playerProvider).next()),
+            ),
+            const SizedBox(width: 4),
+            GlassIconButton(
+              tooltip: mini ? 'Exit mini player' : 'Mini player',
+              icon: Icons.picture_in_picture_alt_rounded,
+              active: mini,
+              onPressed: () => unawaited(setMiniPlayer(ref, !mini)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        _SeekLine(snapshot: snapshot),
+      ],
+    );
+  }
+}
+
+class _Identity extends ConsumerWidget {
+  const _Identity({required this.snapshot});
+
+  final PlayerSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final track = snapshot.track;
+    final quality = _qualityLabel(snapshot);
+    return Row(
+      children: [
+        _CoverButton(snapshot: snapshot, size: 52),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _TitleBlock(snapshot: snapshot, quality: quality),
+        ),
+        if (track != null) ...[
+          const SizedBox(width: 6),
+          _FavoriteButton(trackId: track.id),
+        ],
+      ],
+    );
+  }
+}
+
+class _CoverButton extends StatelessWidget {
+  const _CoverButton({required this.snapshot, required this.size});
+
+  final PlayerSnapshot snapshot;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => openNowPlaying(context),
+      child: CoverImage(
+        url: snapshot.track?.artUri?.toString(),
+        size: size,
+        radius: 10,
+      ),
+    );
+  }
+}
+
+class _TitleBlock extends StatelessWidget {
+  const _TitleBlock({required this.snapshot, this.quality});
+
+  final PlayerSnapshot snapshot;
+  final String? quality;
+
+  @override
+  Widget build(BuildContext context) {
+    final track = snapshot.track;
+    final title = track?.title ?? 'Ready to play';
+    final subtitle = track == null
+        ? 'Click Play or pick any track'
+        : track.album.isEmpty
+        ? track.artist
+        : '${track.artist}  ·  ${track.album}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.w600,
+            color: AppColors.ivory,
+          ),
+        ),
+        Text(
+          subtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        if (quality != null) ...[
+          const SizedBox(height: 4),
+          SourceBadge(quality!),
+        ],
+      ],
+    );
+  }
+}
+
+class _FavoriteButton extends ConsumerWidget {
+  const _FavoriteButton({required this.trackId});
+
+  final String trackId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final favorite =
+        ref.watch(userLibraryProvider).valueOrNull?.isFavorite(trackId) ??
+        false;
+    return GlassIconButton(
+      tooltip: favorite ? 'Remove from favorites' : 'Favorite',
+      icon: favorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+      active: favorite,
+      onPressed: () => unawaited(
+        ref
+            .read(userLibraryProvider.notifier)
+            .mutate((current) => current.toggleFavorite(trackId)),
+      ),
+    );
+  }
+}
+
+class _Transport extends ConsumerWidget {
+  const _Transport({required this.snapshot});
+
+  final PlayerSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final player = ref.read(playerProvider);
+    final track = snapshot.track;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        GlassIconButton(
+          tooltip: snapshot.shuffle ? 'Shuffle on' : 'Shuffle',
+          icon: Icons.shuffle_rounded,
+          active: snapshot.shuffle,
+          onPressed: track == null
+              ? null
+              : () => unawaited(player.setShuffle(!snapshot.shuffle)),
+        ),
+        const SizedBox(width: 4),
+        GlassIconButton(
+          tooltip: 'Previous',
+          icon: Icons.skip_previous_rounded,
+          onPressed: track == null ? null : () => unawaited(player.previous()),
+        ),
+        const SizedBox(width: 6),
+        _PlayButton(
+          playing: snapshot.playing,
+          tooltip: track == null
+              ? 'Play library'
+              : snapshot.playing
+              ? 'Pause'
+              : 'Play',
+          onPressed: () => unawaited(_toggleOrStart(ref, snapshot)),
+        ),
+        const SizedBox(width: 6),
+        GlassIconButton(
+          tooltip: 'Next',
+          icon: Icons.skip_next_rounded,
+          onPressed: track == null ? null : () => unawaited(player.next()),
+        ),
+        const SizedBox(width: 4),
+        GlassIconButton(
+          tooltip: 'Repeat ${_repeatLabel(snapshot.repeat)}',
+          icon: snapshot.repeat == RepeatMode.one
+              ? Icons.repeat_one_rounded
+              : Icons.repeat_rounded,
+          active: snapshot.repeat != RepeatMode.off,
+          onPressed: track == null
+              ? null
+              : () => unawaited(player.cycleRepeat()),
+        ),
+      ],
+    );
+  }
+}
+
+class _Tools extends ConsumerWidget {
+  const _Tools({required this.snapshot, required this.volume});
+
+  final PlayerSnapshot snapshot;
+  final bool volume;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final player = ref.read(playerProvider);
+    final mini = ref.watch(
+      settingsProvider.select((settings) => settings.miniPlayer),
+    );
+    final muted = snapshot.volume < 0.01;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        GlassIconButton(
+          tooltip: 'Lyrics',
+          icon: Icons.lyrics_outlined,
+          size: 32,
+          onPressed: () => openNowPlaying(context),
+        ),
+        const SizedBox(width: 2),
+        GlassIconButton(
+          tooltip: 'Now playing',
+          icon: Icons.open_in_full_rounded,
+          size: 32,
+          onPressed: () => openNowPlaying(context),
+        ),
+        const SizedBox(width: 2),
+        GlassIconButton(
+          tooltip: 'Sound',
+          icon: Icons.equalizer_rounded,
+          size: 32,
+          onPressed: () => showSoundSheet(context, ref),
+        ),
+        const SizedBox(width: 2),
+        GlassIconButton(
+          tooltip: 'Queue',
+          icon: Icons.queue_music_rounded,
+          size: 32,
+          onPressed: () => showQueueSheet(context),
+        ),
+        const SizedBox(width: 2),
+        GlassIconButton(
+          tooltip: muted ? 'Unmute' : 'Mute',
+          icon: muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+          active: muted,
+          size: 32,
+          onPressed: () => unawaited(_setVolume(ref, muted ? 0.9 : 0)),
+        ),
+        if (volume) ...[
+          const SizedBox(width: 2),
+          SizedBox(
+            width: 68,
+            child: Slider(
+              value: snapshot.volume.clamp(0, 1).toDouble(),
+              onChanged: (value) => unawaited(player.setVolume(value)),
+              onChangeEnd: (value) => unawaited(_rememberVolume(ref, value)),
+            ),
+          ),
+        ],
+        const SizedBox(width: 2),
+        GlassIconButton(
+          tooltip: mini ? 'Exit mini player' : 'Mini player',
+          icon: Icons.picture_in_picture_alt_rounded,
+          active: mini,
+          size: 32,
+          onPressed: () => unawaited(setMiniPlayer(ref, !mini)),
+        ),
+      ],
+    );
+  }
+}
+
+class _SeekLine extends ConsumerWidget {
+  const _SeekLine({required this.snapshot});
+
+  final PlayerSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final duration = _duration(snapshot);
+    return Row(
+      children: [
+        SizedBox(
+          width: 44,
+          child: Text(
+            formatClock(snapshot.position),
+            style: AppTheme.tabular.copyWith(fontSize: 11),
+          ),
+        ),
+        Expanded(
+          child: SeekBar(
+            position: snapshot.position,
+            duration: duration,
+            buffered: snapshot.buffered,
+            onSeek: (position) =>
+                unawaited(ref.read(playerProvider).seek(position)),
+          ),
+        ),
+        SizedBox(
+          width: 44,
+          child: Text(
+            formatClock(duration),
+            textAlign: TextAlign.right,
+            style: AppTheme.tabular.copyWith(fontSize: 11),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PlayButton extends StatelessWidget {
+  const _PlayButton({
+    required this.playing,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final bool playing;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: playing ? AppColors.ivory : AppColors.accent,
+        shape: const CircleBorder(
+          side: BorderSide(color: AppColors.mint, width: 1.2),
+        ),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onPressed,
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Icon(
+              playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              color: playing ? AppColors.obsidian : AppColors.ivory,
+            ),
           ),
         ),
       ),
@@ -185,72 +502,189 @@ class MiniPlayerView extends ConsumerWidget {
     final track = snapshot.track;
     final player = ref.read(playerProvider);
     final frosted = ref.watch(settingsProvider).frostedGlass;
-    return GlassSurface(
-      frosted: frosted,
-      color: AppColors.background,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          children: [
-            CoverImage(url: track?.artUri?.toString(), size: 42, radius: 8),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
+    final favorite = track == null
+        ? false
+        : ref.watch(userLibraryProvider).valueOrNull?.isFavorite(track.id) ??
+              false;
+    final muted = snapshot.volume < 0.01;
+    final title =
+        track?.title ??
+        (snapshot.error == null ? 'Nothing playing' : 'Playback unavailable');
+    final subtitle = track == null
+        ? (snapshot.error ?? 'Xerno')
+        : track.album.isEmpty
+        ? track.artist
+        : '${track.artist}  ·  ${track.album}';
+    return Padding(
+      padding: const EdgeInsets.all(10),
+      child: GlassSurface(
+        frosted: frosted,
+        radius: 18,
+        shadow: true,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
                 children: [
-                  Text(
-                    track?.title ??
-                        (snapshot.error == null
-                            ? 'Nothing playing'
-                            : 'Playback unavailable'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: 'Outfit',
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.ivory,
+                  GestureDetector(
+                    onTap: () => unawaited(setMiniPlayer(ref, false)),
+                    child: CoverImage(
+                      url: track?.artUri?.toString(),
+                      size: 48,
+                      radius: 10,
                     ),
                   ),
-                  Text(
-                    track?.artist ?? snapshot.error ?? 'Xerno',
-                    maxLines: snapshot.error != null && track == null ? 3 : 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  if (track != null)
-                    SeekBar(
-                      position: snapshot.position,
-                      duration: snapshot.duration == Duration.zero
-                          ? track.duration
-                          : snapshot.duration,
-                      onSeek: (position) => unawaited(player.seek(position)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => unawaited(setMiniPlayer(ref, false)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.ivory,
+                            ),
+                          ),
+                          Text(
+                            subtitle,
+                            maxLines: track == null && snapshot.error != null
+                                ? 2
+                                : 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
+                  const SizedBox(width: 6),
+                  GlassIconButton(
+                    tooltip: muted ? 'Unmute' : 'Mute',
+                    icon: muted
+                        ? Icons.volume_off_rounded
+                        : Icons.volume_up_rounded,
+                    active: muted,
+                    onPressed: () =>
+                        unawaited(_setVolume(ref, muted ? 0.9 : 0)),
+                  ),
+                  if (track != null) ...[
+                    const SizedBox(width: 4),
+                    GlassIconButton(
+                      tooltip: favorite ? 'Remove from favorites' : 'Favorite',
+                      icon: favorite
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      active: favorite,
+                      onPressed: () => unawaited(
+                        ref
+                            .read(userLibraryProvider.notifier)
+                            .mutate(
+                              (current) => current.toggleFavorite(track.id),
+                            ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: 8),
+                  GlassActionButton(
+                    label: 'Expand',
+                    icon: Icons.open_in_full_rounded,
+                    tooltip: 'Expand to full window',
+                    onPressed: () => unawaited(setMiniPlayer(ref, false)),
+                  ),
                 ],
               ),
-            ),
-            IconButton(
-              tooltip: snapshot.playing ? 'Pause' : 'Play',
-              onPressed: track == null
-                  ? null
-                  : () => unawaited(player.toggle()),
-              icon: Icon(
-                snapshot.playing
-                    ? Icons.pause_rounded
-                    : Icons.play_arrow_rounded,
-                color: AppColors.mint,
+              if (track != null) ...[
+                const SizedBox(height: 4),
+                SeekBar(
+                  position: snapshot.position,
+                  duration: _duration(snapshot),
+                  buffered: snapshot.buffered,
+                  onSeek: (position) => unawaited(player.seek(position)),
+                ),
+              ],
+              const SizedBox(height: 2),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  GlassIconButton(
+                    tooltip: 'Previous',
+                    icon: Icons.skip_previous_rounded,
+                    onPressed: track == null
+                        ? null
+                        : () => unawaited(player.previous()),
+                  ),
+                  const SizedBox(width: 8),
+                  _PlayButton(
+                    playing: snapshot.playing,
+                    tooltip: track == null
+                        ? 'Play library'
+                        : snapshot.playing
+                        ? 'Pause'
+                        : 'Play',
+                    onPressed: () => unawaited(_toggleOrStart(ref, snapshot)),
+                  ),
+                  const SizedBox(width: 8),
+                  GlassIconButton(
+                    tooltip: 'Next',
+                    icon: Icons.skip_next_rounded,
+                    onPressed: track == null
+                        ? null
+                        : () => unawaited(player.next()),
+                  ),
+                ],
               ),
-            ),
-            IconButton(
-              tooltip: 'Next',
-              onPressed: track == null ? null : () => unawaited(player.next()),
-              icon: const Icon(Icons.skip_next_rounded),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+Future<void> setMiniPlayer(WidgetRef ref, bool enabled) async {
+  await ref
+      .read(settingsProvider.notifier)
+      .update((current) => current.copyWith(miniPlayer: enabled));
+  await DesktopWindow.setMini(enabled);
+}
+
+Future<void> _toggleOrStart(WidgetRef ref, PlayerSnapshot snapshot) async {
+  if (snapshot.track == null) {
+    final catalog = ref.read(libraryProvider).valueOrNull;
+    if (catalog == null || catalog.tracks.isEmpty) return;
+    await playTracks(ref, tracks: catalog.tracks, contextLabel: 'Library');
+    return;
+  }
+  await ref.read(playerProvider).toggle();
+}
+
+Future<void> _setVolume(WidgetRef ref, double volume) async {
+  await ref.read(playerProvider).setVolume(volume);
+  await _rememberVolume(ref, volume);
+}
+
+Future<void> _rememberVolume(WidgetRef ref, double volume) async {
+  await ref
+      .read(settingsProvider.notifier)
+      .update((current) => current.copyWith(volume: volume));
+}
+
+String? _qualityLabel(PlayerSnapshot snapshot) {
+  final track = snapshot.track;
+  if (track == null) return null;
+  final source = snapshot.sourceLabel;
+  final word = source == 'Pinned' || source == 'Local' ? source! : 'Cloud';
+  return '${track.bitrateKbps} kbps · $word';
 }
 
 void openNowPlaying(BuildContext context) {
@@ -597,9 +1031,10 @@ class _QueueSheet extends ConsumerWidget {
                 children: [
                   Text('Queue', style: Theme.of(context).textTheme.titleLarge),
                   const Spacer(),
-                  TextButton(
+                  GlassActionButton(
+                    label: 'Clear upcoming',
+                    icon: Icons.playlist_remove_rounded,
                     onPressed: () => unawaited(player.clearUpcoming()),
-                    child: const Text('Clear upcoming'),
                   ),
                 ],
               ),

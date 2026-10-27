@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/library.dart';
 import '../models/track.dart';
 import '../state/providers.dart';
-import '../theme/app_theme.dart';
 import 'widgets.dart';
 
 class LibraryViews extends ConsumerWidget {
@@ -101,10 +100,11 @@ class LibraryViews extends ConsumerWidget {
       eyebrow: 'ARTIST',
       coverUrl: tracks.isEmpty ? null : tracks.first.coverUrl,
       onPinAll: () => _pin(ref, tracks),
-      trailing: TextButton(
+      trailing: GlassActionButton(
+        label: 'All artists',
+        icon: Icons.arrow_back_rounded,
         onPressed: () =>
             ref.read(navProvider.notifier).go(ShellSection.artists),
-        child: const Text('All artists'),
       ),
     );
   }
@@ -120,9 +120,10 @@ class LibraryViews extends ConsumerWidget {
       subtitle: artist,
       coverUrl: tracks.isEmpty ? null : tracks.first.coverUrl,
       onPinAll: () => _pin(ref, tracks),
-      trailing: TextButton(
+      trailing: GlassActionButton(
+        label: 'All albums',
+        icon: Icons.arrow_back_rounded,
         onPressed: () => ref.read(navProvider.notifier).go(ShellSection.albums),
-        child: const Text('All albums'),
       ),
     );
   }
@@ -171,7 +172,7 @@ class _ArtistIndex extends ConsumerWidget {
           child: groups.isEmpty
               ? const Center(child: Text('No artists in this catalog yet.'))
               : GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(28, 8, 28, 28),
+                  padding: const EdgeInsets.fromLTRB(28, 8, 28, 148),
                   itemCount: groups.length,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: _columns(context),
@@ -221,7 +222,7 @@ class _AlbumIndex extends ConsumerWidget {
           child: groups.isEmpty
               ? const Center(child: Text('No albums in this catalog yet.'))
               : GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(28, 8, 28, 28),
+                  padding: const EdgeInsets.fromLTRB(28, 8, 28, 148),
                   itemCount: groups.length,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: _columns(context),
@@ -247,7 +248,7 @@ class _AlbumIndex extends ConsumerWidget {
   }
 }
 
-class _IndexCard extends StatelessWidget {
+class _IndexCard extends ConsumerWidget {
   const _IndexCard({
     required this.title,
     required this.subtitle,
@@ -261,13 +262,11 @@ class _IndexCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: AppColors.border),
-      ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final frosted = ref.watch(settingsProvider).frostedGlass;
+    return GlassSurface(
+      frosted: frosted,
+      radius: 14,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),

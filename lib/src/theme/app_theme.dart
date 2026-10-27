@@ -4,6 +4,10 @@ class AppColors {
   const AppColors._();
 
   static const background = Color(0xFF0A0D0B);
+  static const obsidian = Color(0xFF080B09);
+  static const glowDeep = Color(0xFF1B4332);
+  static const glowIvory = Color(0xFFD8F3DC);
+  static const glowSoft = Color(0xFFB7E4C7);
   static const surface = Color(0xFF111714);
   static const elevated = Color(0xFF16201B);
   static const border = Color(0xFF1E2621);

@@ -183,6 +183,12 @@ void main() {
       expect(settings.eqGains, [1, 2, 0, 0, 0]);
       expect(settings.frostedGlass, isFalse);
       expect(settings.manifestUrl, kDefaultManifestUrl);
+      expect(settings.miniPlayer, isFalse);
+      final trapped = AppSettings.fromJson(const {
+        'mini_player': true,
+        'device_id': 'abc',
+      });
+      expect(trapped.miniPlayer, isFalse);
       final again = AppSettings.fromJson(settings.toJson());
       expect(again.deviceId, 'abc');
       expect(again.eqPreset, 'Flat');

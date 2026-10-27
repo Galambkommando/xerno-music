@@ -76,7 +76,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final status = ref.watch(syncStatusProvider);
     final email = SupabaseGate.currentEmail();
     return ListView(
-      padding: const EdgeInsets.fromLTRB(28, 28, 28, 36),
+      padding: const EdgeInsets.fromLTRB(28, 28, 28, 160),
       children: [
         const Eyebrow('PREFERENCES'),
         const SizedBox(height: 8),
@@ -90,7 +90,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Frosted glass'),
                 subtitle: const Text(
-                  'Blur the now playing bar and modal sheets.',
+                  'Frost the panels over the forest glow and album art.',
                 ),
                 value: settings.frostedGlass,
                 onChanged: (value) =>
@@ -111,7 +111,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Mini player'),
                   subtitle: const Text(
-                    'Compact always-on-top window for the desktop.',
+                    'Compact always-on-top window for this session. Expand, or press Escape, to return. The next launch opens the full window.',
                   ),
                   value: settings.miniPlayer,
                   onChanged: (value) =>
@@ -136,18 +136,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
+                runSpacing: 8,
                 children: [
-                  OutlinedButton(
+                  GlassActionButton(
+                    label: 'Refresh manifest',
+                    icon: Icons.refresh_rounded,
                     onPressed: _refreshCloud,
-                    child: const Text('Refresh manifest'),
                   ),
-                  OutlinedButton(
+                  GlassActionButton(
+                    label: 'Use bundled catalog',
+                    icon: Icons.inventory_2_outlined,
                     onPressed: _useBundled,
-                    child: const Text('Use bundled catalog'),
                   ),
-                  OutlinedButton(
+                  GlassActionButton(
+                    label: 'Import JSON',
+                    icon: Icons.file_download_outlined,
                     onPressed: () => unawaited(importCatalogFile(context, ref)),
-                    child: const Text('Import JSON'),
                   ),
                 ],
               ),
@@ -163,14 +167,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
+                runSpacing: 8,
                 children: [
-                  OutlinedButton(
+                  GlassActionButton(
+                    label: 'Choose folder',
+                    icon: Icons.folder_open_rounded,
                     onPressed: _pickFolder,
-                    child: const Text('Choose folder'),
                   ),
-                  OutlinedButton(
+                  GlassActionButton(
+                    label: 'Reload folder',
+                    icon: Icons.sync_rounded,
                     onPressed: _reloadLocal,
-                    child: const Text('Reload folder'),
                   ),
                 ],
               ),
@@ -257,11 +264,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  OutlinedButton(
+                  GlassActionButton(
+                    label: 'New code',
+                    icon: Icons.key_rounded,
                     onPressed: _newRoom,
-                    child: const Text('New code'),
                   ),
-                  OutlinedButton(
+                  GlassActionButton(
+                    label: 'Copy',
+                    icon: Icons.copy_rounded,
                     onPressed: () async {
                       await Clipboard.setData(
                         ClipboardData(text: normalizeRoomCode(_room.text)),
@@ -269,15 +279,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       if (!context.mounted) return;
                       showNote(context, 'Copied the room code.');
                     },
-                    child: const Text('Copy'),
                   ),
-                  OutlinedButton(
+                  GlassActionButton(
+                    label: 'Push',
+                    icon: Icons.upload_rounded,
                     onPressed: () => _push(room: true),
-                    child: const Text('Push'),
                   ),
-                  OutlinedButton(
+                  GlassActionButton(
+                    label: 'Pull',
+                    icon: Icons.download_rounded,
                     onPressed: () => _pull(room: true),
-                    child: const Text('Pull'),
                   ),
                 ],
               ),
@@ -330,7 +341,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              OutlinedButton(onPressed: _connect, child: const Text('Connect')),
+              GlassActionButton(
+                label: 'Connect',
+                icon: Icons.link_rounded,
+                onPressed: _connect,
+              ),
               const SizedBox(height: 8),
               Text(
                 email == null ? 'Signed out' : 'Signed in as $email',
@@ -353,29 +368,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  OutlinedButton(
+                  GlassActionButton(
+                    label: 'Sign in',
+                    icon: Icons.login_rounded,
                     onPressed: _signIn,
-                    child: const Text('Sign in'),
                   ),
-                  OutlinedButton(
+                  GlassActionButton(
+                    label: 'Create account',
+                    icon: Icons.person_add_alt_rounded,
                     onPressed: _signUp,
-                    child: const Text('Create account'),
                   ),
-                  OutlinedButton(
+                  GlassActionButton(
+                    label: 'Magic link',
+                    icon: Icons.mark_email_unread_outlined,
                     onPressed: _magic,
-                    child: const Text('Magic link'),
                   ),
-                  OutlinedButton(
+                  GlassActionButton(
+                    label: 'Sign out',
+                    icon: Icons.logout_rounded,
                     onPressed: _signOut,
-                    child: const Text('Sign out'),
                   ),
-                  OutlinedButton(
+                  GlassActionButton(
+                    label: 'Push account',
+                    icon: Icons.upload_rounded,
                     onPressed: () => _push(room: false),
-                    child: const Text('Push account'),
                   ),
-                  OutlinedButton(
+                  GlassActionButton(
+                    label: 'Pull account',
+                    icon: Icons.download_rounded,
                     onPressed: () => _pull(room: false),
-                    child: const Text('Pull account'),
                   ),
                 ],
               ),
@@ -392,13 +413,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           child: Wrap(
             spacing: 8,
             children: [
-              OutlinedButton(
+              GlassActionButton(
+                label: 'Import JSON',
+                icon: Icons.file_download_outlined,
                 onPressed: () => unawaited(importUserLibrary(context, ref)),
-                child: const Text('Import'),
               ),
-              OutlinedButton(
+              GlassActionButton(
+                label: 'Export JSON',
+                icon: Icons.file_upload_outlined,
                 onPressed: () => unawaited(exportUserLibrary(context, ref)),
-                child: const Text('Export'),
               ),
             ],
           ),
@@ -586,29 +609,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
-class _Panel extends StatelessWidget {
+class _Panel extends ConsumerWidget {
   const _Panel({required this.title, required this.child});
 
   final String title;
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 18),
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          child,
-        ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final frosted = ref.watch(
+      settingsProvider.select((settings) => settings.frostedGlass),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: GlassSurface(
+        frosted: frosted,
+        radius: 16,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              child,
+            ],
+          ),
+        ),
       ),
     );
   }
