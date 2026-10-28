@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -8,10 +9,13 @@ import 'package:xerno_music/src/logic/lrc.dart';
 import 'package:xerno_music/src/logic/play_queue.dart';
 import 'package:xerno_music/src/logic/source_resolver.dart';
 import 'package:xerno_music/src/logic/track_query.dart';
+import 'package:xerno_music/src/models/library.dart';
 import 'package:xerno_music/src/models/settings.dart';
 import 'package:xerno_music/src/models/sync.dart';
 import 'package:xerno_music/src/models/track.dart';
 import 'package:xerno_music/src/models/user_library.dart';
+import 'package:xerno_music/src/services/http_get.dart';
+import 'package:xerno_music/src/services/lyrics_client.dart';
 
 void main() {
   group('play queue', () {
@@ -134,6 +138,59 @@ void main() {
       );
     });
 
+    test('main artists lead by appearance and hide one-off features', () {
+      final index = LibraryIndex(
+        const LibraryManifest(
+          tracks: [
+            TrackRecord(
+              id: '1',
+              title: 'A',
+              artist: 'Kanye West',
+              artists: ['Kanye West', '88-Keys'],
+              albumArtist: 'Kanye West',
+              album: 'Late Registration',
+            ),
+            TrackRecord(
+              id: '2',
+              title: 'B',
+              artist: 'Kanye West',
+              artists: ['Kanye West'],
+              albumArtist: 'Kanye West',
+              album: 'Graduation',
+            ),
+            TrackRecord(
+              id: '3',
+              title: 'C',
+              artist: 'ILLIT',
+              artists: ['ILLIT'],
+              albumArtist: 'ILLIT',
+              album: 'SUPER REAL ME',
+            ),
+          ],
+        ),
+      );
+      final main = index.listedArtists();
+      expect(main.map((group) => group.name).toList(), ['Kanye West', 'ILLIT']);
+      expect(main.first.trackCount, 2);
+      expect(main.first.albumCount, 2);
+      final all = index.listedArtists(mainOnly: false);
+      expect(all.map((group) => group.name), contains('88-Keys'));
+      expect(index.creditArtistCount, 3);
+      final alpha = index.listedArtists(alphabetical: true);
+      expect(alpha.first.name, 'ILLIT');
+      expect(
+        lyricLineProgress(
+          const [
+            LyricLine(Duration(seconds: 1), 'One'),
+            LyricLine(Duration(seconds: 3), 'Two'),
+          ],
+          0,
+          const Duration(seconds: 2),
+        ),
+        0.5,
+      );
+    });
+
     test('keeps unknown years last while sorting', () {
       const tracks = [
         TrackRecord(
@@ -251,4 +308,186 @@ void main() {
       expect(mapEqGain(1, 2, const [0, 10]), closeTo(10, 0.001));
     });
   });
+
+  test('lyrics search runs when the exact lookup is overloaded', () async {
+    final client = LyricsClient(
+      _ScriptedHttp({
+        '/api/get': const HttpText(
+          status: 503,
+          body: '{"statusCode":503,"name":"ServerOverloaded"}',
+        ),
+        '/api/search': const HttpText(
+          status: 200,
+          body: '[{"trackName":"Bound 2","duration":230,"syncedLyrics":"[00:01.00] Bound to fall in love\\n[00:08.00] All them other lines"}]',
+        ),
+      }),
+    );
+    final lyrics = await client.fetch(
+      trackId: 'bound-2',
+      title: 'Bound 2',
+      artist: 'Kanye West',
+      album: 'Def Jam Classics (Volume 1)',
+      durationSec: 230,
+    );
+    expect(lyrics.hasSynced, isTrue);
+    expect(lyrics.synced.first.text, 'Bound to fall in love');
+    expect(lyrics.source, LyricsSource.lrclib);
+    expect(lyrics.synced.first.words, isNotEmpty);
+  });
+
+  test('apple syllable lyrics join parts and keep romanization', () {
+    final lyrics = lyricsFromAppleMusic({
+      'type': 'Syllable',
+      'metadata': {
+        'songwriters': ['Slow Rabbit'],
+        'transliterations': [
+          {
+            'lang': 'ko-Latn',
+            'lines': [
+              {'key': 'L1', 'text': 'Baby'},
+            ],
+          },
+        ],
+        'translations': [
+          {
+            'lang': 'en-US',
+            'lines': [
+              {'key': 'L5', 'text': 'Wait a minute, what is this'},
+            ],
+          },
+        ],
+      },
+      'content': [
+        {
+          'timestamp': 571,
+          'endtime': 1495,
+          'text': [
+            {'text': 'Ba', 'timestamp': 571, 'endtime': 865, 'part': true},
+            {'text': 'by', 'timestamp': 865, 'endtime': 1495, 'part': false},
+          ],
+          'backgroundText': [],
+          'oppositeTurn': false,
+          'key': 'L1',
+        },
+        {
+          'timestamp': 4000,
+          'endtime': 5200,
+          'text': [
+            {'text': '이게', 'timestamp': 4000, 'endtime': 4600, 'part': false},
+            {'text': '뭐지', 'timestamp': 4600, 'endtime': 5200, 'part': false},
+          ],
+          'key': 'L5',
+        },
+      ],
+    });
+    expect(lyrics, isNotNull);
+    expect(lyrics!.sync, LyricsSync.syllable);
+    expect(lyrics.sourceLabel, 'Syllable Synced · Apple Music / Spicy');
+    expect(lyrics.synced.first.text, 'Baby');
+    expect(lyrics.synced.first.words.single.text, 'Baby');
+    expect(lyrics.synced.first.words.single.pieces.map((piece) => piece.text), [
+      'Ba',
+      'by',
+    ]);
+    expect(lyrics.synced.first.romanization, 'Baby');
+    expect(distinctLyricNote('Baby', 'Baby'), isNull);
+    expect(distinctLyricNote('i ge mwo ji', '이게 뭐지'), 'i ge mwo ji');
+    expect(lyrics.synced[1].translation, 'Wait a minute, what is this');
+    expect(lyrics.songwriters, ['Slow Rabbit']);
+    expect(romanizeHangul('한글'), 'hangeul');
+    expect(
+      pickAppleTrackId(
+        {
+          'results': [
+            {
+              'trackId': 9,
+              'trackName': 'Other',
+              'artistName': 'Someone',
+              'trackTimeMillis': 100000,
+            },
+            {
+              'trackId': 42,
+              'trackName': 'Magnetic',
+              'artistName': 'ILLIT',
+              'trackTimeMillis': 160000,
+            },
+          ],
+        },
+        title: 'Magnetic',
+        artist: 'ILLIT',
+        durationSec: 161,
+      ),
+      42,
+    );
+  });
+
+  test('apple lyrics are used when the first lookup fails', () async {
+    final client = LyricsClient(
+      _ScriptedHttp(const {}),
+      fallback: _ScriptedHttp({
+        '/search': HttpText(
+          status: 200,
+          body: jsonEncode({
+            'results': [
+              {
+                'trackId': 42,
+                'trackName': 'Magnetic',
+                'artistName': 'ILLIT',
+                'trackTimeMillis': 160000,
+              },
+            ],
+          }),
+        ),
+        '/apple-music/lyrics': HttpText(
+          status: 200,
+          body: jsonEncode({
+            'type': 'Syllable',
+            'content': [
+              {
+                'timestamp': 571,
+                'endtime': 1495,
+                'text': [
+                  {
+                    'text': 'Ba',
+                    'timestamp': 571,
+                    'endtime': 865,
+                    'part': true,
+                  },
+                  {
+                    'text': 'by',
+                    'timestamp': 865,
+                    'endtime': 1495,
+                    'part': false,
+                  },
+                ],
+                'key': 'L1',
+              },
+            ],
+          }),
+        ),
+      }),
+    );
+    final lyrics = await client.fetch(
+      trackId: 'magnetic',
+      title: 'Magnetic',
+      artist: 'ILLIT',
+      album: 'SUPER REAL ME',
+      durationSec: 161,
+    );
+    expect(lyrics.source, LyricsSource.apple);
+    expect(lyrics.sync, LyricsSync.syllable);
+    expect(lyrics.sourceLabel, 'Syllable Synced · Apple Music / Spicy');
+    expect(lyrics.synced.single.text, 'Baby');
+  });
+}
+
+class _ScriptedHttp implements HttpGet {
+  _ScriptedHttp(this.bodies);
+
+  final Map<String, HttpText> bodies;
+
+  @override
+  Future<HttpText> get(Uri uri, {Map<String, String>? headers}) async {
+    return bodies[uri.path] ?? const HttpText(status: 500, body: '');
+  }
 }

@@ -104,7 +104,8 @@ cp "$ROOT/assets/icons/xerno.png" "$APPDIR/xerno-music.png"
 cp "$ROOT/assets/icons/xerno.png" "$APPDIR/.DirIcon"
 
 mkdir -p "$OUT"
-TOOL="$OUT/appimagetool-x86_64.AppImage"
+rm -f "$OUT/appimagetool-x86_64.AppImage"
+TOOL="${TMPDIR:-/tmp}/appimagetool-x86_64.AppImage"
 if [[ ! -x "$TOOL" ]]; then
   curl -fsSL -o "$TOOL" \
     "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"

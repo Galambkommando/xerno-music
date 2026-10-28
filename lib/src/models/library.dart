@@ -254,12 +254,35 @@ class ArtistGroup {
   const ArtistGroup({
     required this.name,
     required this.trackCount,
+    this.primaryCount = 0,
+    this.albumCount = 0,
     this.coverUrl,
   });
 
   final String name;
   final int trackCount;
+  final int primaryCount;
+  final int albumCount;
   final String? coverUrl;
+
+  /// A main artist leads at least one track, or shows up more than once.
+  bool get isMain => primaryCount >= 1 || trackCount >= 2;
+}
+
+/// Album artist when it names a real person, otherwise the first credited name.
+String? primaryArtistName(TrackRecord track) {
+  final album = track.albumArtist.trim();
+  if (album.isNotEmpty && album.toLowerCase() != 'various artists') {
+    return album;
+  }
+  for (final name in track.artists) {
+    final trimmed = name.trim();
+    if (trimmed.isNotEmpty) return trimmed;
+  }
+  final artist = track.artist.trim();
+  if (artist.isEmpty) return null;
+  final first = artist.split(',').first.trim();
+  return first.isEmpty ? null : first;
 }
 
 class AlbumGroup {
@@ -282,6 +305,16 @@ class AlbumGroup {
 
 String albumKeyFor(TrackRecord track) =>
     '${track.albumArtist}\u0000${track.album}';
+
+enum AlbumOrder { tracks, newest, name }
+
+class _ArtistBucket {
+  int credits = 0;
+  int primary = 0;
+  int coverScore = -1;
+  String? cover;
+  final albums = <String>{};
+}
 
 class LibraryIndex {
   LibraryIndex(this.manifest)
@@ -328,51 +361,135 @@ class LibraryIndex {
     return tracks.where((track) => albumKeyFor(track) == key).toList();
   }
 
-  List<ArtistGroup> get artists {
-    final counts = <String, int>{};
-    final covers = <String, String?>{};
-    for (final track in tracks) {
-      final names = track.artists.isEmpty ? [track.artist] : track.artists;
-      for (final name in names) {
-        if (name.trim().isEmpty) continue;
-        counts[name] = (counts[name] ?? 0) + 1;
-        covers.putIfAbsent(name, () => track.coverUrl);
-      }
-    }
+  /// Main artists, most tracks first. Featured one-offs stay out of this list.
+  List<ArtistGroup> get artists => listedArtists();
+
+  int get creditArtistCount => _artistGroups().length;
+
+  List<ArtistGroup> listedArtists({
+    bool mainOnly = true,
+    bool alphabetical = false,
+    String query = '',
+  }) {
+    final needle = query.trim().toLowerCase();
     final groups = [
-      for (final entry in counts.entries)
-        ArtistGroup(
-          name: entry.key,
-          trackCount: entry.value,
-          coverUrl: covers[entry.key],
-        ),
+      for (final group in _artistGroups())
+        if ((!mainOnly || group.isMain) &&
+            (needle.isEmpty || group.name.toLowerCase().contains(needle)))
+          group,
     ];
-    groups.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    groups.sort((a, b) {
+      if (!alphabetical) {
+        final byCount = b.trackCount.compareTo(a.trackCount);
+        if (byCount != 0) return byCount;
+      }
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
     return groups;
   }
 
-  List<AlbumGroup> get albums {
+  List<ArtistGroup> _artistGroups() {
+    final buckets = <String, _ArtistBucket>{};
+    for (final track in tracks) {
+      final names = <String>{
+        for (final name in track.artists)
+          if (name.trim().isNotEmpty) name.trim(),
+      };
+      final primary = primaryArtistName(track);
+      if (names.isEmpty && primary != null) names.add(primary);
+      for (final name in names) {
+        final bucket = buckets.putIfAbsent(name, _ArtistBucket.new);
+        bucket.credits++;
+        if (name == primary) bucket.primary++;
+        if (track.album.trim().isNotEmpty) {
+          bucket.albums.add(albumKeyFor(track));
+        }
+        final cover = track.coverUrl;
+        if (cover == null || cover.isEmpty) continue;
+        final score = (name == primary ? 100000 : 0) + track.popularity;
+        if (score >= bucket.coverScore) {
+          bucket.coverScore = score;
+          bucket.cover = cover;
+        }
+      }
+    }
+    return [
+      for (final entry in buckets.entries)
+        ArtistGroup(
+          name: entry.key,
+          trackCount: entry.value.credits,
+          primaryCount: entry.value.primary,
+          albumCount: entry.value.albums.length,
+          coverUrl: entry.value.cover,
+        ),
+    ];
+  }
+
+  List<AlbumGroup> get albums => listedAlbums();
+
+  List<AlbumGroup> listedAlbums({
+    AlbumOrder order = AlbumOrder.tracks,
+    String query = '',
+  }) {
     final grouped = <String, List<TrackRecord>>{};
     for (final track in tracks) {
       if (track.album.trim().isEmpty) continue;
       grouped.putIfAbsent(albumKeyFor(track), () => []).add(track);
     }
-    final groups = [
-      for (final entry in grouped.entries)
+    final needle = query.trim().toLowerCase();
+    final groups = <AlbumGroup>[];
+    for (final entry in grouped.entries) {
+      final sample = entry.value.first;
+      final artist = sample.albumArtist.isEmpty
+          ? sample.artist
+          : sample.albumArtist;
+      if (needle.isNotEmpty &&
+          !sample.album.toLowerCase().contains(needle) &&
+          !artist.toLowerCase().contains(needle)) {
+        continue;
+      }
+      int? year;
+      String? cover;
+      var coverScore = -1;
+      for (final track in entry.value) {
+        final nextYear = track.year;
+        if (nextYear != null && (year == null || nextYear > year)) {
+          year = nextYear;
+        }
+        final art = track.coverUrl;
+        if (art == null || art.isEmpty) continue;
+        if (track.popularity >= coverScore) {
+          coverScore = track.popularity;
+          cover = art;
+        }
+      }
+      groups.add(
         AlbumGroup(
           key: entry.key,
-          title: entry.value.first.album,
-          artist: entry.value.first.albumArtist.isEmpty
-              ? entry.value.first.artist
-              : entry.value.first.albumArtist,
-          year: entry.value.first.year,
+          title: sample.album,
+          artist: artist,
+          year: year,
           trackCount: entry.value.length,
-          coverUrl: entry.value.first.coverUrl,
+          coverUrl: cover ?? sample.coverUrl,
         ),
-    ];
-    groups.sort(
-      (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
-    );
+      );
+    }
+    groups.sort((a, b) {
+      switch (order) {
+        case AlbumOrder.tracks:
+          final byCount = b.trackCount.compareTo(a.trackCount);
+          if (byCount != 0) return byCount;
+          return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+        case AlbumOrder.newest:
+          final ay = a.year ?? -1;
+          final by = b.year ?? -1;
+          final byYear = by.compareTo(ay);
+          if (byYear != 0) return byYear;
+          return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+        case AlbumOrder.name:
+          return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+      }
+    });
     return groups;
   }
 

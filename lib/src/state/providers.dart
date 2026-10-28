@@ -258,7 +258,7 @@ final sourceResolverProvider = Provider<SourceResolver>(
 );
 
 final lyricsClientProvider = Provider<LyricsClient>(
-  (ref) => LyricsClient(IoHttpGet()),
+  (ref) => LyricsClient(IoHttpGet(), fallback: Ipv4HttpGet()),
 );
 
 final lyricsProvider = FutureProvider.family<Lyrics, String>((

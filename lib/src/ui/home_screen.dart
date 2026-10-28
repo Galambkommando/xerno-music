@@ -12,6 +12,27 @@ import 'playback_actions.dart';
 import 'playlist_io.dart';
 import 'widgets.dart';
 
+Future<void> playCatalog(
+  BuildContext context,
+  WidgetRef ref,
+  List<TrackRecord> tracks, {
+  bool shuffle = false,
+  String? label,
+}) async {
+  final ordered = [...tracks];
+  if (shuffle) ordered.shuffle();
+  final note = await playTracks(
+    ref,
+    tracks: ordered,
+    contextLabel: label ?? 'Library',
+  );
+  if (shuffle) {
+    await ref.read(playerProvider).setShuffle(true);
+  }
+  if (!context.mounted) return;
+  showNote(context, note);
+}
+
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({required this.catalog, super.key});
 
@@ -20,113 +41,31 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final frosted = ref.watch(settingsProvider).frostedGlass;
-    final featured = catalog.tracks.take(8).toList();
+    final ranked = [...catalog.tracks]
+      ..sort((a, b) => b.popularity.compareTo(a.popularity));
+    final featured = ranked.take(12).toList();
+    final artists = catalog.listedArtists().take(8).toList();
+    final phone = MediaQuery.sizeOf(context).width < 900;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 148),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 148),
       children: [
-        GlassSurface(
-          frosted: frosted,
-          radius: 20,
-          shadow: true,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final search = TextField(
-                  decoration: xernoField(
-                    'Search the library',
-                    hint: 'Title, artist, album, year',
-                  ).copyWith(prefixIcon: const Icon(Icons.search_rounded)),
-                  onSubmitted: (value) =>
-                      ref.read(navProvider.notifier).search(value),
-                );
-                final copy = Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Eyebrow('ON THE GO'),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Xerno',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Editorial playback for the Xernover library.',
-                      style: Theme.of(context).textTheme.bodyMedium
-                          ?.copyWith(color: AppColors.sage),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _StatPill('${formatInt(catalog.tracks.length)} Tracks'),
-                        const _StatPill('320 kbps MP3'),
-                        const _StatPill('RöcsögeCloud'),
-                        _StatPill(
-                          '${formatInt(catalog.manifest.playlists.length)} Playlists',
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        PrimaryActionPill(
-                          label: 'Play library',
-                          icon: Icons.play_arrow_rounded,
-                          onPressed: catalog.tracks.isEmpty
-                              ? null
-                              : () => unawaited(
-                                  _play(
-                                    context,
-                                    ref,
-                                    catalog.tracks,
-                                    shuffle: false,
-                                  ),
-                                ),
-                        ),
-                        GlassActionButton(
-                          label: 'Shuffle all',
-                          icon: Icons.shuffle_rounded,
-                          onPressed: catalog.tracks.isEmpty
-                              ? null
-                              : () => unawaited(
-                                  _play(
-                                    context,
-                                    ref,
-                                    catalog.tracks,
-                                    shuffle: true,
-                                  ),
-                                ),
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-                if (constraints.maxWidth < 760) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [copy, const SizedBox(height: 12), search],
-                  );
-                }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(child: copy),
-                    const SizedBox(width: 18),
-                    SizedBox(width: 280, child: search),
-                  ],
-                );
-              },
+        if (phone)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Xerno',
+              style: TextStyle(
+                fontFamily: 'Newsreader',
+                fontSize: 28,
+                height: 1,
+                color: AppColors.ivory,
+              ),
             ),
           ),
-        ),
+        _HomeToolbar(catalog: catalog),
         const SizedBox(height: 18),
-        const Eyebrow('PREMADE'),
-        const SizedBox(height: 12),
+        const Eyebrow('YOUR COLLECTIONS'),
+        const SizedBox(height: 10),
         LayoutBuilder(
           builder: (context, constraints) {
             final columns = constraints.maxWidth >= 860
@@ -140,9 +79,9 @@ class HomeScreen extends ConsumerWidget {
               itemCount: catalog.manifest.playlists.length,
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: columns,
-                mainAxisExtent: columns >= 4 ? 206 : 236,
-                crossAxisSpacing: 14,
-                mainAxisSpacing: 14,
+                childAspectRatio: columns == 1 ? 1.15 : 0.78,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
               ),
               itemBuilder: (context, index) {
                 final playlist = catalog.manifest.playlists[index];
@@ -156,80 +95,165 @@ class HomeScreen extends ConsumerWidget {
                   onPlay: tracks.isEmpty
                       ? null
                       : () => unawaited(
-                          _play(context, ref, tracks, label: playlist.name),
+                          playCatalog(
+                            context,
+                            ref,
+                            tracks,
+                            label: playlist.name,
+                          ),
                         ),
                 );
               },
             );
           },
         ),
+        if (artists.isNotEmpty) ...[
+          const SizedBox(height: 22),
+          const Eyebrow('TOP ARTISTS'),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 118,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: artists.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 14),
+              itemBuilder: (context, index) {
+                final artist = artists[index];
+                return _ArtistChip(
+                  name: artist.name,
+                  count: artist.trackCount,
+                  coverUrl: artist.coverUrl,
+                  onTap: () =>
+                      ref.read(navProvider.notifier).openArtist(artist.name),
+                );
+              },
+            ),
+          ),
+        ],
         const SizedBox(height: 22),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final sideBySide = constraints.maxWidth >= 860;
-            final picks = _QuickPicks(catalog: catalog, tracks: featured);
-            const yours = _YourPlaylists();
-            if (!sideBySide) {
-              return Column(
-                children: [picks, const SizedBox(height: 14), yours],
-              );
-            }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 3, child: picks),
-                const SizedBox(width: 14),
-                Expanded(flex: 2, child: yours),
-              ],
-            );
-          },
-        ),
+        _QuickPicks(catalog: catalog, tracks: featured),
+        const SizedBox(height: 14),
+        const _YourPlaylists(),
       ],
     );
   }
+}
 
-  Future<void> _play(
-    BuildContext context,
-    WidgetRef ref,
-    List<TrackRecord> tracks, {
-    bool shuffle = false,
-    String? label,
-  }) async {
-    final ordered = [...tracks];
-    if (shuffle) ordered.shuffle();
-    final note = await playTracks(
-      ref,
-      tracks: ordered,
-      contextLabel: label ?? 'Library',
+class _HomeToolbar extends ConsumerWidget {
+  const _HomeToolbar({required this.catalog});
+
+  final LibraryIndex catalog;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final nav = ref.read(navProvider.notifier);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final search = TextField(
+          decoration: xernoField('Search songs, artists, albums...')
+              .copyWith(prefixIcon: const Icon(Icons.search_rounded)),
+          onSubmitted: (value) => nav.search(value),
+        );
+        final filters = Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            GlassActionButton(
+              label: 'All songs',
+              icon: Icons.library_music_rounded,
+              onPressed: () => nav.go(ShellSection.songs),
+            ),
+            GlassActionButton(
+              label: 'Artists',
+              icon: Icons.person_rounded,
+              onPressed: () => nav.go(ShellSection.artists),
+            ),
+            GlassActionButton(
+              label: 'Albums',
+              icon: Icons.album_rounded,
+              onPressed: () => nav.go(ShellSection.albums),
+            ),
+            GlassActionButton(
+              label: 'Favorites',
+              icon: Icons.favorite_rounded,
+              onPressed: () => nav.go(ShellSection.favorites),
+            ),
+            PrimaryActionPill(
+              label: 'Play all',
+              icon: Icons.play_arrow_rounded,
+              onPressed: catalog.tracks.isEmpty
+                  ? null
+                  : () => unawaited(playCatalog(context, ref, catalog.tracks)),
+            ),
+            GlassActionButton(
+              label: 'Shuffle',
+              icon: Icons.shuffle_rounded,
+              onPressed: catalog.tracks.isEmpty
+                  ? null
+                  : () => unawaited(
+                      playCatalog(context, ref, catalog.tracks, shuffle: true),
+                    ),
+            ),
+          ],
+        );
+        if (constraints.maxWidth < 760) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [search, const SizedBox(height: 10), filters],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 2, child: search),
+            const SizedBox(width: 12),
+            Flexible(flex: 3, child: filters),
+          ],
+        );
+      },
     );
-    if (shuffle) {
-      await ref.read(playerProvider).setShuffle(true);
-    }
-    if (!context.mounted) return;
-    showNote(context, note);
   }
 }
 
-class _StatPill extends StatelessWidget {
-  const _StatPill(this.label);
+class _ArtistChip extends StatelessWidget {
+  const _ArtistChip({
+    required this.name,
+    required this.count,
+    required this.onTap,
+    this.coverUrl,
+  });
 
-  final String label;
+  final String name;
+  final int count;
+  final String? coverUrl;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontFamily: 'Outfit',
-          fontSize: 12,
-          color: AppColors.ivory,
+    return InkWell(
+      onTap: onTap,
+      mouseCursor: SystemMouseCursors.click,
+      borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        width: 84,
+        child: Column(
+          children: [
+            ClipOval(child: CoverImage(url: coverUrl, size: 72, radius: 36)),
+            const SizedBox(height: 6),
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: 'Outfit',
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                color: AppColors.ivory,
+              ),
+            ),
+            Text('$count', style: Theme.of(context).textTheme.bodySmall),
+          ],
         ),
       ),
     );
@@ -260,7 +284,7 @@ class _QuickPicks extends ConsumerWidget {
                 runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  const Eyebrow('QUICK PICK'),
+                  const Eyebrow('FEATURED TRACKS'),
                   GlassActionButton(
                     label: 'View all ${formatInt(catalog.tracks.length)} songs',
                     icon: Icons.arrow_forward_rounded,
@@ -277,16 +301,47 @@ class _QuickPicks extends ConsumerWidget {
                 child: Text('The catalog has no tracks yet.'),
               )
             else
-              for (var index = 0; index < tracks.length; index++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: TrackRow(
-                    track: tracks[index],
-                    number: index + 1,
-                    onPlay: () =>
-                        unawaited(_playFrom(context, ref, tracks, index)),
-                  ),
-                ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  Widget row(int index) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: TrackRow(
+                        track: tracks[index],
+                        number: index + 1,
+                        onPlay: () =>
+                            unawaited(_playFrom(context, ref, tracks, index)),
+                      ),
+                    );
+                  }
+
+                  if (constraints.maxWidth < 760) {
+                    return Column(
+                      children: [
+                        for (var i = 0; i < tracks.length; i++) row(i),
+                      ],
+                    );
+                  }
+                  final pairs = <Widget>[];
+                  for (var i = 0; i < tracks.length; i += 2) {
+                    pairs.add(
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: row(i)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: i + 1 < tracks.length
+                                ? row(i + 1)
+                                : const SizedBox.shrink(),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return Column(children: pairs);
+                },
+              ),
           ],
         ),
       ),

@@ -57,32 +57,41 @@ class _SoundControlsState extends ConsumerState<SoundControls> {
           'Crossfade  ${_crossfade.toStringAsFixed(1)}s',
           style: AppTheme.tabular,
         ),
-        Slider(
-          value: _crossfade,
-          min: 0,
-          max: 12,
-          divisions: 24,
-          label: '${_crossfade.toStringAsFixed(1)}s',
-          onChanged: (value) => setState(() => _crossfade = value),
-          onChangeEnd: (value) => unawaited(_applyCrossfade(value)),
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Slider(
+            value: _crossfade,
+            min: 0,
+            max: 12,
+            divisions: 24,
+            label: '${_crossfade.toStringAsFixed(1)}s',
+            onChanged: (value) => setState(() => _crossfade = value),
+            onChangeEnd: (value) => unawaited(_applyCrossfade(value)),
+          ),
         ),
         Text('Speed  ${_speed.toStringAsFixed(2)}×', style: AppTheme.tabular),
-        Slider(
-          value: _speed,
-          min: 0.5,
-          max: 2,
-          divisions: 30,
-          onChanged: (value) => setState(() => _speed = value),
-          onChangeEnd: (value) => unawaited(_applySpeed(value)),
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Slider(
+            value: _speed,
+            min: 0.5,
+            max: 2,
+            divisions: 30,
+            onChanged: (value) => setState(() => _speed = value),
+            onChangeEnd: (value) => unawaited(_applySpeed(value)),
+          ),
         ),
         Text('Pitch  ${_pitch.toStringAsFixed(2)}', style: AppTheme.tabular),
-        Slider(
-          value: _pitch,
-          min: 0.5,
-          max: 1.5,
-          divisions: 20,
-          onChanged: (value) => setState(() => _pitch = value),
-          onChangeEnd: (value) => unawaited(_applyPitch(value)),
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Slider(
+            value: _pitch,
+            min: 0.5,
+            max: 1.5,
+            divisions: 20,
+            onChanged: (value) => setState(() => _pitch = value),
+            onChangeEnd: (value) => unawaited(_applyPitch(value)),
+          ),
         ),
         const SizedBox(height: 8),
         SwitchListTile(
@@ -122,16 +131,19 @@ class _SoundControlsState extends ConsumerState<SoundControls> {
                 ),
               ),
               Expanded(
-                child: Slider(
-                  value: _gains[i].clamp(-12, 12).toDouble(),
-                  min: -12,
-                  max: 12,
-                  divisions: 24,
-                  onChanged: (value) => setState(() {
-                    _gains[i] = value;
-                    _preset = 'Custom';
-                  }),
-                  onChangeEnd: (_) => unawaited(_applyEq()),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Slider(
+                    value: _gains[i].clamp(-12, 12).toDouble(),
+                    min: -12,
+                    max: 12,
+                    divisions: 24,
+                    onChanged: (value) => setState(() {
+                      _gains[i] = value;
+                      _preset = 'Custom';
+                    }),
+                    onChangeEnd: (_) => unawaited(_applyEq()),
+                  ),
                 ),
               ),
               SizedBox(

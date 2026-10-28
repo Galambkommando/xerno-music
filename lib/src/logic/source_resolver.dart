@@ -102,6 +102,19 @@ class SourceResolver {
   }
 }
 
+/// Direct RöcsögeCloud URL for a track, or a cloud-base join when only a path exists.
+String? serverLinkFor(TrackRecord track, String cloudBaseUrl) {
+  final direct = track.file.ziplineUrl?.trim();
+  if (direct != null && direct.isNotEmpty) return direct;
+  for (final appearance in track.appearances) {
+    final url = appearance.ziplineUrl?.trim();
+    if (url != null && url.isNotEmpty) return url;
+  }
+  final base = cloudBaseUrl.trim();
+  if (base.isEmpty || track.file.relativePath.isEmpty) return null;
+  return joinCloudUrl(base, track.file.relativePath);
+}
+
 String joinCloudUrl(String base, String relative) {
   final trimmed = base.endsWith('/')
       ? base.substring(0, base.length - 1)
