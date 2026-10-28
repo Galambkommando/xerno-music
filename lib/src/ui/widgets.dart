@@ -192,7 +192,7 @@ class SecondaryActionPill extends GlassActionButton {
   });
 }
 
-class GlassIconButton extends StatelessWidget {
+class GlassIconButton extends StatefulWidget {
   const GlassIconButton({
     required this.icon,
     required this.onPressed,
@@ -211,40 +211,292 @@ class GlassIconButton extends StatelessWidget {
   final double iconSize;
 
   @override
+  State<GlassIconButton> createState() => _GlassIconButtonState();
+}
+
+class _GlassIconButtonState extends State<GlassIconButton> {
+  bool _hover = false;
+  bool _down = false;
+
+  @override
   Widget build(BuildContext context) {
-    final button = Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(12),
-        child: Ink(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: active
-                ? AppColors.accent.withValues(alpha: 0.55)
-                : Colors.white.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: active
-                  ? AppColors.mint.withValues(alpha: 0.7)
-                  : Colors.white.withValues(alpha: 0.14),
-            ),
-          ),
-          child: Center(
-            child: Icon(
-              icon,
-              size: iconSize,
-              color: onPressed == null
-                  ? AppColors.sage.withValues(alpha: 0.45)
-                  : AppColors.ivory,
+    final enabled = widget.onPressed != null;
+    final scale = !enabled
+        ? 1.0
+        : _down
+        ? 0.90
+        : _hover
+        ? 1.12
+        : 1.0;
+    final button = MouseRegion(
+      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      onEnter: enabled ? (_) => setState(() => _hover = true) : null,
+      onExit: (_) => setState(() {
+        _hover = false;
+        _down = false;
+      }),
+      child: GestureDetector(
+        onTapDown: enabled ? (_) => setState(() => _down = true) : null,
+        onTapUp: enabled ? (_) => setState(() => _down = false) : null,
+        onTapCancel: () => setState(() => _down = false),
+        child: AnimatedScale(
+          scale: scale,
+          duration: Duration(milliseconds: _down ? 90 : 150),
+          curve: Curves.easeOutCubic,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.onPressed,
+              mouseCursor: enabled
+                  ? SystemMouseCursors.click
+                  : SystemMouseCursors.basic,
+              borderRadius: BorderRadius.circular(12),
+              child: Ink(
+                width: widget.size,
+                height: widget.size,
+                decoration: BoxDecoration(
+                  color: widget.active
+                      ? AppColors.accent.withValues(alpha: _hover ? 0.75 : 0.55)
+                      : Colors.white.withValues(alpha: _hover ? 0.14 : 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: widget.active || _hover
+                        ? AppColors.mint.withValues(alpha: _hover ? 0.65 : 0.4)
+                        : Colors.white.withValues(alpha: 0.14),
+                  ),
+                  boxShadow: _hover
+                      ? [
+                          BoxShadow(
+                            color: AppColors.mint.withValues(alpha: 0.35),
+                            blurRadius: 12,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      widget.icon,
+                      size: widget.iconSize,
+                      color: enabled
+                          ? AppColors.ivory
+                          : AppColors.sage.withValues(alpha: 0.45),
+                      shadows: _hover
+                          ? [
+                              Shadow(
+                                color: AppColors.mint.withValues(alpha: 0.6),
+                                blurRadius: 12,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    if (widget.active)
+                      Positioned(
+                        bottom: 4,
+                        child: Container(
+                          width: 4,
+                          height: 4,
+                          decoration: const BoxDecoration(
+                            color: AppColors.mint,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
       ),
     );
-    if (tooltip == null) return button;
-    return Tooltip(message: tooltip, child: button);
+    if (widget.tooltip == null) return button;
+    return Tooltip(message: widget.tooltip, child: button);
+  }
+}
+
+class PlayerTransportButton extends StatelessWidget {
+  const PlayerTransportButton({
+    required this.icon,
+    required this.onPressed,
+    this.tooltip,
+    this.active = false,
+    this.size = 44,
+    this.iconSize = 26,
+    super.key,
+  });
+
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final String? tooltip;
+  final bool active;
+  final double size;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassIconButton(
+      icon: icon,
+      onPressed: onPressed,
+      tooltip: tooltip,
+      active: active,
+      size: size,
+      iconSize: iconSize,
+    );
+  }
+}
+
+class AnimatedPlayButton extends StatefulWidget {
+  const AnimatedPlayButton({
+    required this.playing,
+    required this.onPressed,
+    this.tooltip,
+    this.size = 48,
+    super.key,
+  });
+
+  final bool playing;
+  final VoidCallback? onPressed;
+  final String? tooltip;
+  final double size;
+
+  @override
+  State<AnimatedPlayButton> createState() => _AnimatedPlayButtonState();
+}
+
+class _AnimatedPlayButtonState extends State<AnimatedPlayButton>
+    with SingleTickerProviderStateMixin {
+  bool _hover = false;
+  bool _down = false;
+  AnimationController? _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncPulse();
+  }
+
+  @override
+  void didUpdateWidget(AnimatedPlayButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.playing != widget.playing) _syncPulse();
+  }
+
+  void _syncPulse() {
+    if (!widget.playing) {
+      _pulse?.stop();
+      return;
+    }
+    _pulse ??= AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+    if (!_pulse!.isAnimating) _pulse!.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulse?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onPressed != null;
+    final scale = !enabled
+        ? 1.0
+        : _down
+        ? 0.92
+        : _hover
+        ? 1.08
+        : 1.0;
+    final button = AnimatedBuilder(
+      animation: _pulse ?? const AlwaysStoppedAnimation<double>(0),
+      builder: (context, _) {
+        final pulse = widget.playing ? (_pulse?.value ?? 0) : 0.0;
+        return _playFace(enabled, scale, pulse);
+      },
+    );
+    if (widget.tooltip == null) return button;
+    return Tooltip(message: widget.tooltip, child: button);
+  }
+
+  Widget _playFace(bool enabled, double scale, double pulse) {
+    return MouseRegion(
+      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      onEnter: enabled ? (_) => setState(() => _hover = true) : null,
+      onExit: (_) => setState(() {
+        _hover = false;
+        _down = false;
+      }),
+      child: GestureDetector(
+        onTapDown: enabled ? (_) => setState(() => _down = true) : null,
+        onTapUp: enabled ? (_) => setState(() => _down = false) : null,
+        onTapCancel: () => setState(() => _down = false),
+        child: AnimatedScale(
+          scale: scale,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutBack,
+          child: Material(
+            color: Colors.transparent,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: widget.onPressed,
+              mouseCursor: enabled
+                  ? SystemMouseCursors.click
+                  : SystemMouseCursors.basic,
+              child: Ink(
+                width: widget.size,
+                height: widget.size,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: widget.playing
+                      ? null
+                      : const LinearGradient(
+                          colors: [AppColors.accentBright, AppColors.mint],
+                        ),
+                  color: widget.playing ? AppColors.ivory : null,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.mint.withValues(
+                        alpha: 0.35 + (pulse * 0.25) + (_hover ? 0.15 : 0),
+                      ),
+                      blurRadius: _hover ? 24 : 16,
+                      spreadRadius: _hover ? 2 : 0,
+                    ),
+                  ],
+                ),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  transitionBuilder: (child, animation) => ScaleTransition(
+                    scale: animation,
+                    child: RotationTransition(
+                      turns: Tween<double>(
+                        begin: 0.08,
+                        end: 0,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  ),
+                  child: Icon(
+                    widget.playing
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                    key: ValueKey(widget.playing),
+                    color: widget.playing
+                        ? AppColors.obsidian
+                        : AppColors.ivory,
+                    size: widget.size * 0.56,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -271,39 +523,47 @@ class _ActionPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final button = Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(12),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: fill,
-            gradient: gradient,
-            borderRadius: BorderRadius.circular(12),
-            border: border,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (icon != null) ...[
-                  Icon(icon, size: 16, color: foreground),
-                  const SizedBox(width: 6),
-                ],
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontFamily: 'Outfit',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: onPressed == null
-                        ? foreground.withValues(alpha: 0.4)
-                        : foreground,
+    final button = MouseRegion(
+      cursor: onPressed == null
+          ? SystemMouseCursors.basic
+          : SystemMouseCursors.click,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          mouseCursor: onPressed == null
+              ? SystemMouseCursors.basic
+              : SystemMouseCursors.click,
+          borderRadius: BorderRadius.circular(12),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: fill,
+              gradient: gradient,
+              borderRadius: BorderRadius.circular(12),
+              border: border,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 16, color: foreground),
+                    const SizedBox(width: 6),
+                  ],
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: onPressed == null
+                          ? foreground.withValues(alpha: 0.4)
+                          : foreground,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -506,7 +766,7 @@ class Eyebrow extends StatelessWidget {
   }
 }
 
-class SeekBar extends StatelessWidget {
+class SeekBar extends StatefulWidget {
   const SeekBar({
     required this.position,
     required this.duration,
@@ -521,47 +781,90 @@ class SeekBar extends StatelessWidget {
   final ValueChanged<Duration> onSeek;
 
   @override
+  State<SeekBar> createState() => _SeekBarState();
+}
+
+class _SeekBarState extends State<SeekBar> {
+  bool _hover = false;
+  bool _drag = false;
+
+  @override
   Widget build(BuildContext context) {
-    final total = duration.inMilliseconds <= 0 ? 1 : duration.inMilliseconds;
-    final played = (position.inMilliseconds / total).clamp(0.0, 1.0);
-    final loaded = (buffered.inMilliseconds / total).clamp(0.0, 1.0);
+    final total = widget.duration.inMilliseconds <= 0
+        ? 1
+        : widget.duration.inMilliseconds;
+    final played = (widget.position.inMilliseconds / total).clamp(0.0, 1.0);
+    final loaded = (widget.buffered.inMilliseconds / total).clamp(0.0, 1.0);
+    final thick = _hover || _drag;
     return LayoutBuilder(
       builder: (context, constraints) {
         void seekAt(double dx) {
           final fraction = (dx / constraints.maxWidth).clamp(0.0, 1.0);
-          onSeek(Duration(milliseconds: (fraction * total).round()));
+          widget.onSeek(Duration(milliseconds: (fraction * total).round()));
         }
 
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (details) => seekAt(details.localPosition.dx),
-          onHorizontalDragUpdate: (details) => seekAt(details.localPosition.dx),
-          child: SizedBox(
-            height: 22,
-            child: Stack(
-              alignment: Alignment.centerLeft,
-              children: [
-                Container(height: 2, color: AppColors.border),
-                FractionallySizedBox(
-                  widthFactor: loaded.toDouble(),
-                  child: Container(height: 2, color: AppColors.elevated),
-                ),
-                FractionallySizedBox(
-                  widthFactor: played.toDouble(),
-                  child: Container(height: 2, color: AppColors.mint),
-                ),
-                Align(
-                  alignment: Alignment(played * 2 - 1, 0),
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: AppColors.ivory,
-                      shape: BoxShape.circle,
+        return MouseRegion(
+          cursor: _drag
+              ? SystemMouseCursors.grabbing
+              : SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _hover = true),
+          onExit: (_) => setState(() => _hover = false),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (details) => seekAt(details.localPosition.dx),
+            onHorizontalDragStart: (_) => setState(() => _drag = true),
+            onHorizontalDragUpdate: (details) =>
+                seekAt(details.localPosition.dx),
+            onHorizontalDragEnd: (_) => setState(() => _drag = false),
+            onHorizontalDragCancel: () => setState(() => _drag = false),
+            child: SizedBox(
+              height: 28,
+              child: Stack(
+                alignment: Alignment.centerLeft,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    height: thick ? 7 : 4,
+                    color: AppColors.border,
+                  ),
+                  FractionallySizedBox(
+                    widthFactor: loaded.toDouble(),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 140),
+                      height: thick ? 7 : 4,
+                      color: AppColors.elevated,
                     ),
                   ),
-                ),
-              ],
+                  FractionallySizedBox(
+                    widthFactor: played.toDouble(),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 140),
+                      height: thick ? 7 : 4,
+                      color: AppColors.mint,
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment(played * 2 - 1, 0),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 140),
+                      width: thick ? 14 : 8,
+                      height: thick ? 14 : 8,
+                      decoration: BoxDecoration(
+                        color: AppColors.ivory,
+                        shape: BoxShape.circle,
+                        boxShadow: thick
+                            ? [
+                                BoxShadow(
+                                  color: AppColors.mint.withValues(alpha: 0.85),
+                                  blurRadius: 10,
+                                ),
+                              ]
+                            : null,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -607,24 +910,28 @@ class ChoicePill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(right: 8, bottom: 8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(99),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.accent : Colors.transparent,
-            borderRadius: BorderRadius.circular(99),
-            border: Border.all(
-              color: selected ? AppColors.accentBright : AppColors.border,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: InkWell(
+          onTap: onTap,
+          mouseCursor: SystemMouseCursors.click,
+          borderRadius: BorderRadius.circular(99),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: selected ? AppColors.accent : Colors.transparent,
+              borderRadius: BorderRadius.circular(99),
+              border: Border.all(
+                color: selected ? AppColors.accentBright : AppColors.border,
+              ),
             ),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'Outfit',
-              fontSize: 13,
-              color: selected ? AppColors.ivory : AppColors.sage,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Outfit',
+                fontSize: 13,
+                color: selected ? AppColors.ivory : AppColors.sage,
+              ),
             ),
           ),
         ),
@@ -656,6 +963,7 @@ class PlaylistCard extends StatelessWidget {
       color: AppColors.surface,
       child: InkWell(
         onTap: onTap,
+        mouseCursor: SystemMouseCursors.click,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -720,6 +1028,7 @@ class _CoverPlayButton extends StatelessWidget {
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onPressed,
+        mouseCursor: SystemMouseCursors.click,
         child: const SizedBox(
           width: 40,
           height: 40,
@@ -1054,6 +1363,7 @@ class TrackRow extends ConsumerWidget {
       ),
       child: InkWell(
         onTap: onPlay,
+        mouseCursor: SystemMouseCursors.click,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),

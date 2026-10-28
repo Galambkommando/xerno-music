@@ -249,13 +249,14 @@ void main() {
     expect(find.text('Split View'), findsOneWidget);
     expect(find.text('Focus Lyrics'), findsOneWidget);
     expect(find.text('Cover Stage'), findsOneWidget);
-    expect(find.text('Open the pine'), findsOneWidget);
-    expect(find.text('Synced Lyrics · LRCLIB'), findsOneWidget);
+    expect(find.text('Open'), findsOneWidget);
+    expect(find.text('pine'), findsOneWidget);
+    expect(find.text('Line Synced · LRCLIB'), findsOneWidget);
     await tester.tap(find.text('Second line stays dim'));
     await tester.pump();
     expect(playback.snapshot.position, const Duration(seconds: 12));
     await tester.tap(find.text('Focus Lyrics'));
     await tester.pump();
-    expect(find.text('Open the pine'), findsOneWidget);
+    expect(find.text('pine'), findsOneWidget);
   });
 }

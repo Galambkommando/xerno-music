@@ -233,6 +233,7 @@ class _ArtistChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
+      mouseCursor: SystemMouseCursors.click,
       borderRadius: BorderRadius.circular(16),
       child: SizedBox(
         width: 84,

@@ -213,12 +213,15 @@ class _CoverButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => openNowPlaying(context),
-      child: CoverImage(
-        url: snapshot.track?.artUri?.toString(),
-        size: size,
-        radius: 10,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => openNowPlaying(context),
+        child: CoverImage(
+          url: snapshot.track?.artUri?.toString(),
+          size: size,
+          radius: 10,
+        ),
       ),
     );
   }
@@ -239,31 +242,37 @@ class _TitleBlock extends StatelessWidget {
         : track.album.isEmpty
         ? track.artist
         : '${track.artist}  ·  ${track.album}';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontFamily: 'Outfit',
-            fontWeight: FontWeight.w600,
-            color: AppColors.ivory,
-          ),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => openNowPlaying(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: 'Outfit',
+                fontWeight: FontWeight.w600,
+                color: AppColors.ivory,
+              ),
+            ),
+            Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (quality != null) ...[
+              const SizedBox(height: 4),
+              SourceBadge(quality!),
+            ],
+          ],
         ),
-        Text(
-          subtitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        if (quality != null) ...[
-          const SizedBox(height: 4),
-          SourceBadge(quality!),
-        ],
-      ],
+      ),
     );
   }
 }
@@ -397,10 +406,13 @@ class _Tools extends ConsumerWidget {
           const SizedBox(width: 2),
           SizedBox(
             width: 68,
-            child: Slider(
-              value: snapshot.volume.clamp(0, 1).toDouble(),
-              onChanged: (value) => unawaited(player.setVolume(value)),
-              onChangeEnd: (value) => unawaited(_rememberVolume(ref, value)),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: Slider(
+                value: snapshot.volume.clamp(0, 1).toDouble(),
+                onChanged: (value) => unawaited(player.setVolume(value)),
+                onChangeEnd: (value) => unawaited(_rememberVolume(ref, value)),
+              ),
             ),
           ),
         ],
@@ -469,26 +481,11 @@ class _PlayButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: playing ? AppColors.ivory : AppColors.accent,
-        shape: const CircleBorder(
-          side: BorderSide(color: AppColors.mint, width: 1.2),
-        ),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onPressed,
-          child: SizedBox(
-            width: 44,
-            height: 44,
-            child: Icon(
-              playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              color: playing ? AppColors.obsidian : AppColors.ivory,
-            ),
-          ),
-        ),
-      ),
+    return AnimatedPlayButton(
+      playing: playing,
+      tooltip: tooltip,
+      onPressed: onPressed,
+      size: 44,
     );
   }
 }
@@ -529,41 +526,47 @@ class MiniPlayerView extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => unawaited(setMiniPlayer(ref, false)),
-                    child: CoverImage(
-                      url: track?.artUri?.toString(),
-                      size: 48,
-                      radius: 10,
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: () => unawaited(setMiniPlayer(ref, false)),
+                      child: CoverImage(
+                        url: track?.artUri?.toString(),
+                        size: 48,
+                        radius: 10,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => unawaited(setMiniPlayer(ref, false)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontFamily: 'Outfit',
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.ivory,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => unawaited(setMiniPlayer(ref, false)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'Outfit',
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.ivory,
+                              ),
                             ),
-                          ),
-                          Text(
-                            subtitle,
-                            maxLines: track == null && snapshot.error != null
-                                ? 2
-                                : 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
+                            Text(
+                              subtitle,
+                              maxLines: track == null && snapshot.error != null
+                                  ? 2
+                                  : 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -798,49 +801,36 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                       style: AppTheme.tabular,
                     ),
                     const Spacer(),
-                    IconButton(
+                    PlayerTransportButton(
                       tooltip: snapshot.shuffle ? 'Shuffle on' : 'Shuffle off',
+                      icon: Icons.shuffle_rounded,
+                      active: snapshot.shuffle,
                       onPressed: () =>
                           unawaited(player.setShuffle(!snapshot.shuffle)),
-                      icon: Icon(
-                        Icons.shuffle_rounded,
-                        color: snapshot.shuffle
-                            ? AppColors.mint
-                            : AppColors.sage,
-                      ),
                     ),
-                    IconButton(
+                    PlayerTransportButton(
                       tooltip: 'Previous',
+                      icon: Icons.skip_previous_rounded,
                       onPressed: () => unawaited(player.previous()),
-                      icon: const Icon(Icons.skip_previous_rounded, size: 32),
                     ),
-                    IconButton(
+                    AnimatedPlayButton(
                       tooltip: snapshot.playing ? 'Pause' : 'Play',
+                      playing: snapshot.playing,
+                      size: 56,
                       onPressed: () => unawaited(player.toggle()),
-                      icon: Icon(
-                        snapshot.playing
-                            ? Icons.pause_circle_filled_rounded
-                            : Icons.play_circle_fill_rounded,
-                        size: 56,
-                        color: AppColors.ivory,
-                      ),
                     ),
-                    IconButton(
+                    PlayerTransportButton(
                       tooltip: 'Next',
+                      icon: Icons.skip_next_rounded,
                       onPressed: () => unawaited(player.next()),
-                      icon: const Icon(Icons.skip_next_rounded, size: 32),
                     ),
-                    IconButton(
+                    PlayerTransportButton(
                       tooltip: 'Repeat ${_repeatLabel(snapshot.repeat)}',
+                      icon: snapshot.repeat == RepeatMode.one
+                          ? Icons.repeat_one_rounded
+                          : Icons.repeat_rounded,
+                      active: snapshot.repeat != RepeatMode.off,
                       onPressed: () => unawaited(player.cycleRepeat()),
-                      icon: Icon(
-                        snapshot.repeat == RepeatMode.one
-                            ? Icons.repeat_one_rounded
-                            : Icons.repeat_rounded,
-                        color: snapshot.repeat == RepeatMode.off
-                            ? AppColors.sage
-                            : AppColors.mint,
-                      ),
                     ),
                     const Spacer(),
                     Text(
@@ -893,29 +883,33 @@ class _LayoutPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(99),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.accent.withValues(alpha: 0.72)
-              : Colors.black.withValues(alpha: 0.28),
-          borderRadius: BorderRadius.circular(99),
-          border: Border.all(
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: InkWell(
+        onTap: onTap,
+        mouseCursor: SystemMouseCursors.click,
+        borderRadius: BorderRadius.circular(99),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
             color: selected
-                ? AppColors.mint
-                : Colors.white.withValues(alpha: 0.18),
+                ? AppColors.accent.withValues(alpha: 0.72)
+                : Colors.black.withValues(alpha: 0.28),
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(
+              color: selected
+                  ? AppColors.mint
+                  : Colors.white.withValues(alpha: 0.18),
+            ),
           ),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontFamily: 'Outfit',
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-            color: AppColors.ivory,
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'Outfit',
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              color: AppColors.ivory,
+            ),
           ),
         ),
       ),
@@ -987,6 +981,7 @@ class _LyricsPane extends ConsumerWidget {
       data: (value) => SpicyLyricsPane(
         lyrics: value,
         position: snapshot.position,
+        playing: snapshot.playing,
         onSeek: onSeek,
       ),
     );
@@ -1044,6 +1039,7 @@ class _QueueSheet extends ConsumerWidget {
                         final item = snapshot.queue[index];
                         final current = index == snapshot.index;
                         return ListTile(
+                          mouseCursor: SystemMouseCursors.click,
                           onTap: () => unawaited(player.playIndex(index)),
                           leading: Text(
                             '${index + 1}'.padLeft(2, '0'),

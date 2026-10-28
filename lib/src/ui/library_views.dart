@@ -381,6 +381,7 @@ class _FilterPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
+      mouseCursor: SystemMouseCursors.click,
       borderRadius: BorderRadius.circular(99),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
@@ -430,6 +431,7 @@ class _ArtistCard extends StatelessWidget {
       ),
       child: InkWell(
         onTap: onOpen,
+        mouseCursor: SystemMouseCursors.click,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -504,6 +506,7 @@ class _AlbumCard extends StatelessWidget {
       ),
       child: InkWell(
         onTap: onOpen,
+        mouseCursor: SystemMouseCursors.click,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -566,6 +569,7 @@ class _RoundPlay extends StatelessWidget {
       shape: const CircleBorder(side: BorderSide(color: AppColors.mint)),
       child: InkWell(
         customBorder: const CircleBorder(),
+        mouseCursor: SystemMouseCursors.click,
         onTap: onPressed,
         child: const SizedBox(
           width: 32,

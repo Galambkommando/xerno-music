@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -330,6 +331,153 @@ void main() {
     );
     expect(lyrics.hasSynced, isTrue);
     expect(lyrics.synced.first.text, 'Bound to fall in love');
+    expect(lyrics.source, LyricsSource.lrclib);
+    expect(lyrics.synced.first.words, isNotEmpty);
+  });
+
+  test('apple syllable lyrics join parts and keep romanization', () {
+    final lyrics = lyricsFromAppleMusic({
+      'type': 'Syllable',
+      'metadata': {
+        'songwriters': ['Slow Rabbit'],
+        'transliterations': [
+          {
+            'lang': 'ko-Latn',
+            'lines': [
+              {'key': 'L1', 'text': 'Baby'},
+            ],
+          },
+        ],
+        'translations': [
+          {
+            'lang': 'en-US',
+            'lines': [
+              {'key': 'L5', 'text': 'Wait a minute, what is this'},
+            ],
+          },
+        ],
+      },
+      'content': [
+        {
+          'timestamp': 571,
+          'endtime': 1495,
+          'text': [
+            {'text': 'Ba', 'timestamp': 571, 'endtime': 865, 'part': true},
+            {'text': 'by', 'timestamp': 865, 'endtime': 1495, 'part': false},
+          ],
+          'backgroundText': [],
+          'oppositeTurn': false,
+          'key': 'L1',
+        },
+        {
+          'timestamp': 4000,
+          'endtime': 5200,
+          'text': [
+            {'text': '이게', 'timestamp': 4000, 'endtime': 4600, 'part': false},
+            {'text': '뭐지', 'timestamp': 4600, 'endtime': 5200, 'part': false},
+          ],
+          'key': 'L5',
+        },
+      ],
+    });
+    expect(lyrics, isNotNull);
+    expect(lyrics!.sync, LyricsSync.syllable);
+    expect(lyrics.sourceLabel, 'Syllable Synced · Apple Music / Spicy');
+    expect(lyrics.synced.first.text, 'Baby');
+    expect(lyrics.synced.first.words.single.text, 'Baby');
+    expect(lyrics.synced.first.words.single.pieces.map((piece) => piece.text), [
+      'Ba',
+      'by',
+    ]);
+    expect(lyrics.synced.first.romanization, 'Baby');
+    expect(distinctLyricNote('Baby', 'Baby'), isNull);
+    expect(distinctLyricNote('i ge mwo ji', '이게 뭐지'), 'i ge mwo ji');
+    expect(lyrics.synced[1].translation, 'Wait a minute, what is this');
+    expect(lyrics.songwriters, ['Slow Rabbit']);
+    expect(romanizeHangul('한글'), 'hangeul');
+    expect(
+      pickAppleTrackId(
+        {
+          'results': [
+            {
+              'trackId': 9,
+              'trackName': 'Other',
+              'artistName': 'Someone',
+              'trackTimeMillis': 100000,
+            },
+            {
+              'trackId': 42,
+              'trackName': 'Magnetic',
+              'artistName': 'ILLIT',
+              'trackTimeMillis': 160000,
+            },
+          ],
+        },
+        title: 'Magnetic',
+        artist: 'ILLIT',
+        durationSec: 161,
+      ),
+      42,
+    );
+  });
+
+  test('apple lyrics are used when the first lookup fails', () async {
+    final client = LyricsClient(
+      _ScriptedHttp(const {}),
+      fallback: _ScriptedHttp({
+        '/search': HttpText(
+          status: 200,
+          body: jsonEncode({
+            'results': [
+              {
+                'trackId': 42,
+                'trackName': 'Magnetic',
+                'artistName': 'ILLIT',
+                'trackTimeMillis': 160000,
+              },
+            ],
+          }),
+        ),
+        '/apple-music/lyrics': HttpText(
+          status: 200,
+          body: jsonEncode({
+            'type': 'Syllable',
+            'content': [
+              {
+                'timestamp': 571,
+                'endtime': 1495,
+                'text': [
+                  {
+                    'text': 'Ba',
+                    'timestamp': 571,
+                    'endtime': 865,
+                    'part': true,
+                  },
+                  {
+                    'text': 'by',
+                    'timestamp': 865,
+                    'endtime': 1495,
+                    'part': false,
+                  },
+                ],
+                'key': 'L1',
+              },
+            ],
+          }),
+        ),
+      }),
+    );
+    final lyrics = await client.fetch(
+      trackId: 'magnetic',
+      title: 'Magnetic',
+      artist: 'ILLIT',
+      album: 'SUPER REAL ME',
+      durationSec: 161,
+    );
+    expect(lyrics.source, LyricsSource.apple);
+    expect(lyrics.sync, LyricsSync.syllable);
+    expect(lyrics.sourceLabel, 'Syllable Synced · Apple Music / Spicy');
+    expect(lyrics.synced.single.text, 'Baby');
   });
 }
 
